@@ -168,10 +168,11 @@
             const gain = ctx.createGain();
             
             osc.type = 'square';
-            osc.frequency.setValueAtTime(800, ctx.currentTime);
-            osc.frequency.setValueAtTime(1200, ctx.currentTime + 0.15);
-            osc.frequency.setValueAtTime(800, ctx.currentTime + 0.3);
-            osc.frequency.setValueAtTime(1200, ctx.currentTime + 0.45);
+            // Se modificaron las frecuencias a un tono menos agudo (400 y 550)
+            osc.frequency.setValueAtTime(400, ctx.currentTime);
+            osc.frequency.setValueAtTime(550, ctx.currentTime + 0.15);
+            osc.frequency.setValueAtTime(400, ctx.currentTime + 0.3);
+            osc.frequency.setValueAtTime(550, ctx.currentTime + 0.45);
             
             gain.gain.setValueAtTime(0.1, ctx.currentTime);
             
@@ -481,13 +482,20 @@
           const isTimed = exercise.unit === 's' || exercise.duration;
           const totalSets = exercise.sets || 1;
 
-          let targetSeconds = 0;
-          if (exercise.unit === 's' && exercise.minReps) {
-            targetSeconds = exercise.minReps;
+          // Se declaran tiempos objetivo mínimo y máximo
+          let minTargetSeconds = 0;
+          let maxTargetSeconds = 0;
+
+          if (exercise.unit === 's') {
+            if (exercise.minReps) minTargetSeconds = exercise.minReps;
+            if (exercise.maxReps) maxTargetSeconds = exercise.maxReps;
           } else if (exercise.duration) {
             const match = exercise.duration.match(/(\d+)\s*min/);
-            if (match) targetSeconds = parseInt(match[1]) * 60;
-            else targetSeconds = parseInt(exercise.duration) || 0;
+            if (match) {
+                minTargetSeconds = parseInt(match[1]) * 60;
+            } else {
+                minTargetSeconds = parseInt(exercise.duration) || 0;
+            }
           }
 
           useEffect(() => {
@@ -515,7 +523,9 @@
               interval = setInterval(() => {
                 setStopwatchTime(prev => {
                   const nextTime = prev + 1;
-                  if (targetSeconds > 0 && nextTime === targetSeconds) {
+                  // Si el contador llega al mínimo o al máximo suena la alarma
+                  if ((minTargetSeconds > 0 && nextTime === minTargetSeconds) || 
+                      (maxTargetSeconds > 0 && nextTime === maxTargetSeconds && maxTargetSeconds !== minTargetSeconds)) {
                     playAlarm(); 
                   }
                   return nextTime;
@@ -523,7 +533,7 @@
               }, 1000);
             }
             return () => clearInterval(interval);
-          }, [isStopwatchRunning, targetSeconds]);
+          }, [isStopwatchRunning, minTargetSeconds, maxTargetSeconds]);
 
           const handleStopwatchToggle = () => {
             if (isStopwatchRunning) {
