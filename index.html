@@ -62,8 +62,8 @@
                   { id: 'sk1', name: 'Soporte en Anillas (Ring Support)', sets: 3, minReps: 20, maxReps: 30, unit: 's', rest: 90, cue: 'Hombros deprimidos, brazos bloqueados, anillas RTO (hacia afuera).', errorMsg: 'Pérdida de RTO, encogimiento de hombros.' }
                 ],
                 strength: [
-                  { id: 'st1', name: 'Dominadas Pronas', sets: 4, minReps: 6, maxReps: 10, unit: 'reps', rest: 120, cue: 'Iniciar con retracción escapular completa.', errorMsg: 'Uso de impulso, no pasar barbilla, hombros arriba.' },
-                  { id: 'st2', name: 'Flexiones en Anillas', sets: 4, minReps: 10, maxReps: 15, unit: 'reps', rest: 120, cue: 'Cuerpo recto, core activo, anillas juntas al subir.', errorMsg: 'Cadera hundida, temblor incontrolable.', requiresAngle: true },
+                  { id: 'st1', name: 'Dominadas Pronas', minSets: 3, maxSets: 4, minReps: 6, maxReps: 10, unit: 'reps', rest: 120, cue: 'Iniciar con retracción escapular completa.', errorMsg: 'Uso de impulso, no pasar barbilla, hombros arriba.' },
+                  { id: 'st2', name: 'Flexiones en Anillas', minSets: 3, maxSets: 4, minReps: 10, maxReps: 15, unit: 'reps', rest: 120, cue: 'Cuerpo recto, core activo, anillas juntas al subir.', errorMsg: 'Cadera hundida, temblor incontrolable.', requiresAngle: true },
                   { id: 'st3', name: 'Remo en Anillas', sets: 3, minReps: 10, maxReps: 12, unit: 'reps', rest: 90, cue: 'Tirar hasta tocar el pecho, codos pegados.', errorMsg: 'No tocar el pecho, dejar caer el cuerpo.', requiresAngle: true },
                   { id: 'st4', name: 'Fondos en Paralelas', sets: 3, minReps: 8, maxReps: 10, unit: 'reps', rest: 90, cue: 'Bajada lenta y controlada (excéntrica).', errorMsg: 'Balanceo de piernas, no bajar a 90 grados.' }
                 ],
@@ -311,6 +311,14 @@
             }
           };
 
+          const handleOverrideProgress = (newPhase, newWeek) => {
+             setAppState(prev => ({
+                 ...prev,
+                 user: { ...prev.user, phase: parseInt(newPhase), currentWeek: parseInt(newWeek), workoutsCompleted: (parseInt(newWeek) - 1) * 3 }
+             }));
+             alert(`Progreso ajustado exitosamente a Fase ${newPhase}, Semana ${newWeek}`);
+          };
+
           return (
             <div>
               <header className="bg-gray-900 border-b border-gray-800 p-4 sticky top-0 z-10 flex justify-between items-center">
@@ -340,7 +348,7 @@
                 )}
 
                 {currentView === 'settings' && (
-                  <SettingsView onExport={handleExport} onImport={handleImport} history={appState.history} onReset={handleReset} />
+                  <SettingsView onExport={handleExport} onImport={handleImport} history={appState.history} onReset={handleReset} user={appState.user} onOverride={handleOverrideProgress} />
                 )}
               </main>
             </div>
@@ -413,10 +421,58 @@
           const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
           const [activeExercise, setActiveExercise] = useState(null);
           const [logs, setLogs] = useState({});
+          
+          const [isPhaseRest, setIsPhaseRest] = useState(false);
+          const [phaseRestTime, setPhaseRestTime] = useState(0);
+
+          const wakeLockRef = useRef(null);
+
+          // EFECTO DE WAKE LOCK: Evita que la pantalla se apague sola durante el entreno
+          useEffect(() => {
+            const requestWakeLock = async () => {
+              try {
+                if ('wakeLock' in navigator) {
+                  wakeLockRef.current = await navigator.wakeLock.request('screen');
+                }
+              } catch (err) {
+                console.log("Wake Lock falló o fue denegado:", err);
+              }
+            };
+
+            requestWakeLock();
+
+            // Re-solicitar si el usuario minimiza y vuelve a la app
+            const handleVisibilityChange = () => {
+              if (document.visibilityState === 'visible') {
+                requestWakeLock();
+              }
+            };
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+
+            return () => {
+              document.removeEventListener('visibilitychange', handleVisibilityChange);
+              if (wakeLockRef.current) {
+                wakeLockRef.current.release();
+              }
+            };
+          }, []);
 
           const sectionsAvailable = PHASES_ORDER.filter(s => workoutData.routine[s] && workoutData.routine[s].length > 0);
           const currentSectionKey = sectionsAvailable[currentSectionIndex];
           const exercises = workoutData.routine[currentSectionKey] || [];
+
+          // Temporizador de descanso entre fases
+          useEffect(() => {
+            let timer;
+            if (isPhaseRest && phaseRestTime > 0) {
+              timer = setInterval(() => setPhaseRestTime(prev => prev - 1), 1000);
+            } else if (isPhaseRest && phaseRestTime === 0) {
+              playAlarm();
+              setIsPhaseRest(false);
+              setCurrentSectionIndex(prev => prev + 1);
+            }
+            return () => clearInterval(timer);
+          }, [isPhaseRest, phaseRestTime]);
 
           const handleExerciseComplete = (exerciseId, exerciseLogs) => {
             setLogs(prev => ({ ...prev, [exerciseId]: exerciseLogs }));
@@ -425,7 +481,8 @@
 
           const advanceSection = () => {
             if (currentSectionIndex < sectionsAvailable.length - 1) {
-              setCurrentSectionIndex(prev => prev + 1);
+              setIsPhaseRest(true);
+              setPhaseRestTime(120); // 2 minutos de descanso entre fases
             } else {
               onComplete(logs);
             }
@@ -433,6 +490,29 @@
 
           if (activeExercise) {
             return <ExerciseLogger exercise={activeExercise} onSave={(exLogs) => handleExerciseComplete(activeExercise.id, exLogs)} onCancel={() => setActiveExercise(null)} />;
+          }
+
+          if (isPhaseRest) {
+            const mins = Math.floor(phaseRestTime / 60);
+            const secs = phaseRestTime % 60;
+            const nextPhaseName = PHASE_NAMES[sectionsAvailable[currentSectionIndex + 1]];
+            return (
+              <div className="flex flex-col items-center justify-center h-[75vh] animate-fade-in text-center">
+                 <Clock size={64} className="text-emerald-500 mb-6 animate-pulse" />
+                 <h2 className="text-2xl font-black text-gray-400 uppercase tracking-widest mb-2">Cambio de Fase</h2>
+                 <div className="text-7xl font-black text-white tabular-nums tracking-tighter mb-8">
+                   {mins}:{secs < 10 ? '0':''}{secs}
+                 </div>
+                 
+                 <div className="bg-gray-800 p-5 rounded-2xl w-full max-w-sm border border-gray-700 shadow-lg mb-8 text-left">
+                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Siguiente en el programa:</h4>
+                    <p className="text-2xl font-black text-emerald-500 leading-tight mb-1">{nextPhaseName}</p>
+                    <p className="text-sm text-gray-400 mt-2">Respira, hidrátate y ajusta la altura de las anillas.</p>
+                 </div>
+
+                 <button onClick={() => setPhaseRestTime(0)} className="px-6 py-3 rounded-xl bg-gray-800 text-gray-400 font-bold hover:bg-gray-700 transition-colors uppercase tracking-wider text-sm">Saltar descanso de fase</button>
+              </div>
+            );
           }
 
           return (
@@ -448,7 +528,7 @@
 
               <div className="mb-8">
                 <h2 className="text-3xl font-black text-white uppercase tracking-tight">{PHASE_NAMES[currentSectionKey]}</h2>
-                <p className="text-gray-400 text-sm mt-1">Fase {currentSectionIndex + 1} de {sectionsAvailable.length}. No te saltes pasos.</p>
+                <p className="text-gray-400 text-sm mt-1">Fase {currentSectionIndex + 1} de {sectionsAvailable.length}. Pantalla activa encendida.</p>
               </div>
 
               <div className="space-y-3">
@@ -458,9 +538,9 @@
                     <button key={ex.id} onClick={() => setActiveExercise(ex)} className={`w-full text-left p-4 rounded-2xl border transition-all flex justify-between items-center group ${isCompleted ? 'bg-gray-900 border-gray-800 opacity-60' : 'bg-gray-800 border-gray-700 hover:border-emerald-500'}`}>
                       <div>
                          <h4 className={`font-bold ${isCompleted ? 'text-gray-500 line-through' : 'text-white'}`}>{idx + 1}. {ex.name}</h4>
-                         {ex.sets && (
+                         {(ex.sets || ex.maxSets) && (
                            <p className="text-sm text-emerald-500/80 font-medium mt-1">
-                             {ex.sets} Sets x {ex.minReps && ex.maxReps ? `${ex.minReps}-${ex.maxReps}` : ex.reps || ex.duration} {ex.unit || ''}
+                             {ex.minSets ? `${ex.minSets}-${ex.maxSets}` : ex.sets} Sets x {ex.minReps && ex.maxReps ? `${ex.minReps}-${ex.maxReps}` : ex.reps || ex.duration} {ex.unit || ''}
                            </p>
                          )}
                       </div>
@@ -470,9 +550,16 @@
                 })}
               </div>
 
-              <button onClick={advanceSection} className="w-full mt-8 bg-white text-gray-950 font-black uppercase py-4 rounded-2xl hover:bg-gray-200 transition-colors">
-                {currentSectionIndex < sectionsAvailable.length - 1 ? 'Siguiente Fase' : 'Finalizar Entrenamiento'}
-              </button>
+              <div className="mt-8 flex gap-3">
+                  <button onClick={advanceSection} className="flex-1 bg-white text-gray-950 font-black uppercase py-4 rounded-2xl hover:bg-gray-200 transition-colors">
+                    {currentSectionIndex < sectionsAvailable.length - 1 ? 'Siguiente Fase' : 'Finalizar Entrenamiento'}
+                  </button>
+                  {currentSectionIndex < sectionsAvailable.length - 1 && (
+                     <button onClick={advanceSection} className="px-4 bg-gray-800 text-gray-400 font-bold uppercase rounded-2xl border border-gray-700 hover:text-white hover:border-gray-500 transition-colors text-xs text-center flex items-center">
+                        Saltar<br/>Fase
+                     </button>
+                  )}
+              </div>
             </div>
           );
         }
@@ -490,7 +577,7 @@
           const [isStopwatchRunning, setIsStopwatchRunning] = useState(false);
 
           const isTimed = exercise.unit === 's' || exercise.duration;
-          const totalSets = exercise.sets || 1;
+          const totalSets = exercise.maxSets || exercise.sets || 1;
 
           // Se declaran tiempos objetivo mínimo y máximo
           let minTargetSeconds = 0;
@@ -574,7 +661,14 @@
             const newLogs = [...setLogs, newLog];
             setSetLogs(newLogs);
             
-            if (currentSet < totalSets) {
+            // Permitir finalizar si alcanzó el mínimo de sets (ej. 3 de 4)
+            const canFinishEarly = exercise.minSets && currentSet >= exercise.minSets;
+
+            if (currentSet < totalSets && !canFinishEarly) {
+               setIsResting(true);
+               setTimeLeft(exercise.rest || 60);
+            } else if (currentSet < totalSets && canFinishEarly) {
+               // Ya pasó el mínimo, ofrecer descanso pero con opción de acabar
                setIsResting(true);
                setTimeLeft(exercise.rest || 60);
             } else {
@@ -585,6 +679,8 @@
           if (isResting) {
             const mins = Math.floor(timeLeft / 60);
             const secs = timeLeft % 60;
+            const reachedMinSets = exercise.minSets && currentSet >= exercise.minSets;
+
             return (
               <div className="flex flex-col items-center justify-center h-[75vh] animate-fade-in text-center">
                  <Clock size={64} className="text-emerald-500 mb-6 animate-pulse" />
@@ -596,7 +692,7 @@
                  <div className="bg-gray-800 p-5 rounded-2xl w-full max-w-sm border border-gray-700 shadow-lg mb-8 text-left">
                     <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Preparando Siguiente</h4>
                     <p className="text-xl font-black text-white leading-tight mb-1">{exercise.name}</p>
-                    <p className="text-emerald-500 font-bold mb-3 text-sm">Set {currentSet + 1} de {totalSets}</p>
+                    <p className="text-emerald-500 font-bold mb-3 text-sm">Set {currentSet + 1} de {totalSets} {exercise.minSets ? `(Mín: ${exercise.minSets})` : ''}</p>
                     {exercise.cue && (
                       <div className="bg-gray-900 p-3 rounded-lg border-l-2 border-emerald-500">
                         <p className="text-sm text-gray-300">🎯 <span className="font-bold text-emerald-400">Foco:</span> {exercise.cue}</p>
@@ -604,7 +700,12 @@
                     )}
                  </div>
 
-                 <button onClick={() => setTimeLeft(0)} className="px-6 py-2 rounded-full bg-gray-800 text-gray-400 text-sm font-bold hover:bg-gray-700 transition-colors">Saltar descanso</button>
+                 <div className="flex flex-col gap-3 w-full max-w-sm">
+                     <button onClick={() => setTimeLeft(0)} className="w-full py-3 rounded-xl bg-gray-800 text-gray-400 text-sm font-bold hover:bg-gray-700 transition-colors uppercase tracking-widest">Saltar descanso</button>
+                     {reachedMinSets && (
+                         <button onClick={() => onSave(setLogs)} className="w-full py-3 rounded-xl border border-emerald-500/50 text-emerald-400 text-sm font-bold hover:bg-emerald-500/10 transition-colors uppercase tracking-widest">Ya cumplí el mínimo, finalizar</button>
+                     )}
+                 </div>
               </div>
             );
           }
@@ -613,7 +714,7 @@
             <div className="animate-fade-in flex flex-col h-full">
               <div className="flex justify-between items-center mb-6">
                  <button onClick={onCancel} className="text-gray-400 hover:text-white"><ChevronRight className="rotate-180"/></button>
-                 <span className="font-bold text-gray-400">Set {currentSet} / {totalSets}</span>
+                 <span className="font-bold text-gray-400">Set {currentSet} / {totalSets} {exercise.minSets ? `(Mín. ${exercise.minSets})` : ''}</span>
               </div>
 
               <h2 className="text-3xl font-black text-white uppercase tracking-tight leading-none mb-2">{exercise.name}</h2>
@@ -692,13 +793,37 @@
           );
         }
 
-        function SettingsView({ onExport, onImport, history, onReset }) {
+        function SettingsView({ onExport, onImport, history, onReset, user, onOverride }) {
           const fileInputRef = useRef(null);
+          const [overridePhase, setOverridePhase] = useState(user.phase);
+          const [overrideWeek, setOverrideWeek] = useState(user.currentWeek);
 
           return (
             <div className="space-y-6 animate-fade-in">
               <h2 className="text-2xl font-black text-white uppercase tracking-tight mb-6">Ajustes y Datos</h2>
               
+              <div className="bg-gray-900 rounded-2xl p-6 border border-gray-800">
+                <h3 className="font-bold text-white mb-4">Ajuste Manual de Progreso</h3>
+                <p className="text-sm text-gray-400 mb-4">Cambia tu mes o fase manualmente si sientes que el sistema automático no va a tu ritmo.</p>
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                   <div>
+                       <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Fase (Nivel)</label>
+                       <select value={overridePhase} onChange={e => setOverridePhase(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-white focus:border-emerald-500 outline-none">
+                           <option value="1">Fase 1 (Mes 1-4)</option>
+                           <option value="2">Fase 2 (Mes 5-8)</option>
+                           <option value="3">Fase 3 (Mes 9-12)</option>
+                       </select>
+                   </div>
+                   <div>
+                       <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Semana Total</label>
+                       <input type="number" min="1" max="52" value={overrideWeek} onChange={e => setOverrideWeek(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-white focus:border-emerald-500 outline-none" />
+                   </div>
+                </div>
+                <button onClick={() => onOverride(overridePhase, overrideWeek)} className="w-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/50 font-bold py-3 rounded-xl hover:bg-emerald-500/20 transition-colors uppercase text-sm tracking-wider">
+                    Actualizar Nivel
+                </button>
+              </div>
+
               <div className="bg-gray-900 rounded-2xl p-6 border border-gray-800">
                 <h3 className="font-bold text-white mb-2">Resguardo de Progreso</h3>
                 <p className="text-sm text-gray-400 mb-6">La app guarda localmente. Exporta tu progreso si cambias de celular.</p>
