@@ -155,9 +155,9 @@
 
         // --- LÓGICA DE ALARMA (SONIDO Y VIBRACIÓN) ---
         const playAlarm = () => {
-          // Vibración suave tipo notificación: vibra un poco, pausa corta, vibra otro poco
+          // Vibración fuerte y repetitiva: 4 pulsos largos (400ms) separados por pausas cortas (100ms)
           if (typeof navigator !== 'undefined' && navigator.vibrate) {
-            navigator.vibrate([200, 100, 200]);
+            navigator.vibrate([400, 100, 400, 100, 400, 100, 400]);
           }
           
           try {
