@@ -1,0 +1,767 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Play, CheckCircle, AlertTriangle, Clock, ChevronRight, X, Download, Upload, ShieldAlert, Activity, Dumbbell, History, RefreshCcw, Info, Trash2, Timer, Pause } from 'lucide-react';
+
+// --- BASE DE DATOS DE EJERCICIOS Y PERIODIZACIÓN ---
+const WORKOUT_DB = {
+  phases: {
+    1: { // FASE 1: CIMENTACIÓN ANATÓMICA (Meses 1-4)
+      description: "Progreso Lineal. 3 días a la semana misma rutina.",
+      routine: {
+        warmup: [
+          { id: 'w1', name: 'Movilidad Articular General', duration: '5 min' },
+          { id: 'w2', name: 'Warmup Scapular Pull-up', sets: 2, reps: 10, rest: 60 }
+        ],
+        skill: [
+          { id: 'sk1', name: 'Soporte en Anillas (Ring Support)', sets: 3, minReps: 20, maxReps: 30, unit: 's', rest: 90, cue: 'Hombros deprimidos, brazos bloqueados, anillas RTO (hacia afuera).', errorMsg: 'Pérdida de RTO, encogimiento de hombros.' }
+        ],
+        strength: [
+          { id: 'st1', name: 'Dominadas Pronas', sets: 4, minReps: 6, maxReps: 10, unit: 'reps', rest: 120, cue: 'Iniciar con retracción escapular completa.', errorMsg: 'Uso de impulso, no pasar barbilla, hombros arriba.' },
+          { id: 'st2', name: 'Flexiones en Anillas', sets: 4, minReps: 10, maxReps: 15, unit: 'reps', rest: 120, cue: 'Cuerpo recto, core activo, anillas juntas al subir.', errorMsg: 'Cadera hundida, temblor incontrolable.', requiresAngle: true },
+          { id: 'st3', name: 'Remo en Anillas', sets: 3, minReps: 10, maxReps: 12, unit: 'reps', rest: 90, cue: 'Tirar hasta tocar el pecho, codos pegados.', errorMsg: 'No tocar el pecho, dejar caer el cuerpo.', requiresAngle: true },
+          { id: 'st4', name: 'Fondos en Paralelas', sets: 3, minReps: 8, maxReps: 10, unit: 'reps', rest: 90, cue: 'Bajada lenta y controlada (excéntrica).', errorMsg: 'Balanceo de piernas, no bajar a 90 grados.' }
+        ],
+        core: [
+          { id: 'c1', name: 'Hanging Knee Raises', sets: 3, minReps: 12, maxReps: 15, unit: 'reps', rest: 60, cue: 'Movimiento desde la pelvis, bajada lenta.', errorMsg: 'Balanceo excesivo de espalda baja.' },
+          { id: 'c2', name: 'Prehab Scapular Pull-up', sets: 2, minReps: 10, maxReps: 15, unit: 'reps', rest: 60 }
+        ]
+      }
+    },
+    2: { // FASE 2: DESARROLLO (Meses 5-8)
+      description: "Periodización Ondulante Diaria (DUP).",
+      routines: {
+        1: { // Fuerza
+           strength: [
+             { id: 'f2_s1', name: 'Dominadas Arquero (Anillas)', sets: 4, minReps: 5, maxReps: 8, unit: 'reps/lado', rest: 120, cue: 'Foco en tirar con un brazo.', errorMsg: 'Pérdida de tensión en brazo de asistencia.' },
+             { id: 'f2_s2', name: 'Fondos en Anillas', sets: 4, minReps: 6, maxReps: 10, unit: 'reps', rest: 120, cue: 'Anillas separadas (RTO) arriba.', errorMsg: 'Anillas tocan el cuerpo.' }
+           ],
+           core: [ { id: 'f2_c1', name: 'Tuck L-Sit Hold', sets: 4, minReps: 15, maxReps: 20, unit: 's', rest: 90 } ]
+        },
+        2: { // Hipertrofia
+           strength: [
+             { id: 'f2_h1', name: 'Remo Anillas c/ Pausa', sets: 3, minReps: 10, maxReps: 12, unit: 'reps', rest: 90, cue: 'Pausa de 2s en el pecho.', errorMsg: 'No mantener la pausa.' },
+             { id: 'f2_h2', name: 'Flexiones Anillas (Pies Elevados)', sets: 3, minReps: 12, maxReps: 15, unit: 'reps', rest: 90 },
+             { id: 'f2_h3', name: 'Pike Push-ups', sets: 3, minReps: 8, maxReps: 12, unit: 'reps', rest: 90 }
+           ],
+           core: [] // Asumiendo core basico si no se especifica
+        },
+        3: { // Potencia
+           strength: [
+             { id: 'f2_p1', name: 'Dominadas Explosivas', sets: 3, minReps: 5, maxReps: 15, unit: 'reps', rest: 120, cue: 'Parar a RPE 9, antes del fallo.', errorMsg: 'Llegar al fallo técnico absoluto.' }
+           ],
+           core: [ { id: 'f2_c2', name: 'Ring Roll-outs', sets: 4, minReps: 10, maxReps: 12, unit: 'reps', rest: 90, errorMsg: 'Arquear zona lumbar.' } ],
+           prehab: [ { id: 'f2_pr1', name: 'Face Pulls + Rot. Ext.', sets: 3, minReps: 15, maxReps: 15, unit: 'reps', rest: 60 } ]
+        }
+      }
+    },
+    3: { // FASE 3: MAESTRÍA (Meses 9-12)
+       description: "Habilidades Avanzadas. Tiempos de descanso largos.",
+       routine: {
+           strength: [
+             { id: 'f3_s1', name: 'Muscle-up en Anillas', sets: 5, minReps: 3, maxReps: 5, unit: 'reps', rest: 180, cue: 'Transición rápida y fluida.', errorMsg: 'Asimetría al subir, uso de patada.' },
+             { id: 'f3_s2', name: 'Fondos en Anillas (RTO Constante)', sets: 4, minReps: 8, maxReps: 12, unit: 'reps', rest: 120, cue: 'Mantener anillas hacia afuera todo el tiempo.', errorMsg: 'Perder RTO en la bajada.' },
+             { id: 'f3_s3', name: 'Front Lever Progresión (Straddle)', sets: 5, minReps: 5, maxReps: 10, unit: 's', rest: 120, cue: 'Cuerpo paralelo al suelo.', errorMsg: 'Caída de cadera.' },
+             { id: 'f3_s4', name: 'Archer Push-ups Anillas', sets: 4, minReps: 8, maxReps: 10, unit: 'reps/lado', rest: 120, cue: 'Brazo de asistencia totalmente recto.', errorMsg: 'Flexionar codo de asistencia.' }
+           ],
+           core: [
+             { id: 'f3_c1', name: 'Hanging Leg Raises (Toes to bar)', sets: 3, minReps: 10, maxReps: 15, unit: 'reps', rest: 90, cue: 'Rodillas bloqueadas.', errorMsg: 'Flexionar rodillas.' },
+             { id: 'f3_c2', name: 'Dragon Flag (Negativas)', sets: 3, minReps: 5, maxReps: 8, unit: 'reps', rest: 120, cue: 'Bajar recto como tabla (5s).', errorMsg: 'Doblar la cadera al bajar.' }
+           ]
+       }
+    }
+  }
+};
+
+const getWorkoutForDay = (phase, week, dayOfWeekIndex) => {
+    const isDeload = week % 5 === 0;
+    let baseRoutine = {};
+
+    if (phase === 1) baseRoutine = WORKOUT_DB.phases[1].routine;
+    if (phase === 2) {
+        // dayOfWeekIndex: 0 (Martes), 1 (Jueves), 2 (Sábado) aprox
+        const routineKey = (dayOfWeekIndex % 3) + 1;
+        baseRoutine = {
+            warmup: WORKOUT_DB.phases[1].routine.warmup, // Reutilizar calentamiento
+            skill: WORKOUT_DB.phases[1].routine.skill,
+            ...WORKOUT_DB.phases[2].routines[routineKey]
+        };
+    }
+    if (phase === 3) baseRoutine = {
+        warmup: WORKOUT_DB.phases[1].routine.warmup,
+        skill: WORKOUT_DB.phases[1].routine.skill,
+        ...WORKOUT_DB.phases[3].routine
+    };
+
+    // Aplicar lógica de descarga (Deload)
+    if (isDeload) {
+        const deloadRoutine = {};
+        for (const [section, exercises] of Object.entries(baseRoutine)) {
+            if (Array.isArray(exercises)) {
+                deloadRoutine[section] = exercises.map(ex => ({
+                    ...ex,
+                    sets: ex.sets ? Math.max(1, Math.ceil(ex.sets / 2)) : ex.sets
+                }));
+            }
+        }
+        return deloadRoutine;
+    }
+
+    return baseRoutine;
+};
+
+// --- COMPONENTES PRINCIPALES ---
+
+export default function App() {
+  const [appState, setAppState] = useState({
+    user: { startDate: new Date().toISOString(), phase: 1, currentWeek: 1, workoutsCompleted: 0 },
+    history: [],
+    lastWorkoutDate: null
+  });
+  const [currentView, setCurrentView] = useState('home'); // home, workout, settings
+  const [activeWorkout, setActiveWorkout] = useState(null);
+
+  // Cargar estado inicial
+  useEffect(() => {
+    const saved = localStorage.getItem('calisthenics_data');
+    if (saved) {
+      try { setAppState(JSON.parse(saved)); } catch (e) { console.error("Error parsing save", e); }
+    }
+  }, []);
+
+  // Guardar estado
+  useEffect(() => {
+    localStorage.setItem('calisthenics_data', JSON.stringify(appState));
+  }, [appState]);
+
+  const checkRestStatus = () => {
+    if (!appState.lastWorkoutDate) return { isReady: true, hoursLeft: 0 };
+    const last = new Date(appState.lastWorkoutDate).getTime();
+    const now = new Date().getTime();
+    const diffHours = (now - last) / (1000 * 60 * 60);
+    return {
+      isReady: diffHours >= 48,
+      hoursLeft: Math.max(0, 48 - diffHours).toFixed(1)
+    };
+  };
+
+  const startWorkout = () => {
+    const dayIndex = appState.user.workoutsCompleted % 3;
+    const routine = getWorkoutForDay(appState.user.phase, appState.user.currentWeek, dayIndex);
+    
+    setActiveWorkout({
+      routine,
+      phaseLog: { warmup: false, skill: false, strength: false, core: false },
+      currentSection: 'warmup',
+      exerciseLogs: {},
+      startTime: Date.now()
+    });
+    setCurrentView('workout');
+  };
+
+  const finishWorkout = (logs) => {
+    const newHistoryEntry = {
+      date: new Date().toISOString(),
+      week: appState.user.currentWeek,
+      phase: appState.user.phase,
+      logs
+    };
+
+    let newWeek = appState.user.currentWeek;
+    let newPhase = appState.user.phase;
+    let completed = appState.user.workoutsCompleted + 1;
+
+    // Lógica de avance de fase (Aprox 4 semanas * 3 dias = 12 entrenos por mes, 4 meses = 48 entrenos)
+    if (completed % 3 === 0) newWeek++; // Avanza semana cada 3 entrenos
+    if (newWeek > 16) { newPhase = 2; } // Mes 5
+    if (newWeek > 32) { newPhase = 3; } // Mes 9
+
+    setAppState(prev => ({
+      ...prev,
+      user: { ...prev.user, currentWeek: newWeek, phase: newPhase, workoutsCompleted: completed },
+      history: [...prev.history, newHistoryEntry],
+      lastWorkoutDate: new Date().toISOString()
+    }));
+    
+    setActiveWorkout(null);
+    setCurrentView('home');
+  };
+
+  const handleExport = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appState));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", "calistenia_backup.json");
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+  };
+
+  const handleImport = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const importedData = JSON.parse(event.target.result);
+        if (importedData.user && importedData.history) {
+          setAppState(importedData);
+          alert("Progreso restaurado con éxito.");
+        } else {
+          alert("Archivo inválido.");
+        }
+      } catch (err) {
+        alert("Error al leer el archivo.");
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleReset = () => {
+    if (window.confirm("¿Estás seguro de que deseas reiniciar todo tu progreso? Esto borrará tu historial y volverás a la Fase 1, Semana 1. Esta acción NO se puede deshacer.")) {
+      const defaultState = {
+        user: { startDate: new Date().toISOString(), phase: 1, currentWeek: 1, workoutsCompleted: 0 },
+        history: [],
+        lastWorkoutDate: null
+      };
+      setAppState(defaultState);
+      localStorage.setItem('calisthenics_data', JSON.stringify(defaultState));
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-950 text-gray-100 font-sans selection:bg-emerald-500 selection:text-white pb-20">
+      {/* Header General */}
+      <header className="bg-gray-900 border-b border-gray-800 p-4 sticky top-0 z-10 flex justify-between items-center">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center">
+             <Dumbbell size={18} className="text-gray-950" />
+          </div>
+          <h1 className="font-black text-xl tracking-tighter uppercase text-white">Rings<span className="text-emerald-500">Pro</span></h1>
+        </div>
+        <div className="flex gap-4">
+          <button onClick={() => setCurrentView('home')} className={`p-2 rounded-full ${currentView === 'home' ? 'text-emerald-500 bg-gray-800' : 'text-gray-400'}`}>
+            <Activity size={20} />
+          </button>
+          <button onClick={() => setCurrentView('settings')} className={`p-2 rounded-full ${currentView === 'settings' ? 'text-emerald-500 bg-gray-800' : 'text-gray-400'}`}>
+            <History size={20} />
+          </button>
+        </div>
+      </header>
+
+      {/* Vistas */}
+      <main className="max-w-md mx-auto w-full p-4">
+        {currentView === 'home' && (
+          <Dashboard 
+            user={appState.user} 
+            restStatus={checkRestStatus()} 
+            onStart={startWorkout} 
+          />
+        )}
+        
+        {currentView === 'workout' && activeWorkout && (
+          <WorkoutEngine 
+            workoutData={activeWorkout} 
+            isDeload={appState.user.currentWeek % 5 === 0}
+            onComplete={finishWorkout} 
+            onAbort={() => setCurrentView('home')}
+          />
+        )}
+
+        {currentView === 'settings' && (
+          <SettingsView onExport={handleExport} onImport={handleImport} history={appState.history} onReset={handleReset} />
+        )}
+      </main>
+    </div>
+  );
+}
+
+// --- SUB-COMPONENTES ---
+
+function Dashboard({ user, restStatus, onStart }) {
+  const isDeload = user.currentWeek % 5 === 0;
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div className="bg-gray-900 rounded-3xl p-6 border border-gray-800 shadow-xl relative overflow-hidden">
+        <div className="absolute -right-10 -top-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl"></div>
+        
+        <h2 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-1">Tu Programa</h2>
+        <div className="flex items-end gap-2 mb-4">
+          <span className="text-4xl font-black text-white">Fase {user.phase}</span>
+          <span className="text-emerald-500 font-bold mb-1">/ Sem {user.currentWeek}</span>
+        </div>
+
+        {isDeload && (
+          <div className="bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 mb-4">
+            <RefreshCcw size={16} /> SEMANA DE DESCARGA ACTIVA (Sets al 50%)
+          </div>
+        )}
+
+        <div className="flex gap-4 mb-6">
+           <div className="bg-gray-800 rounded-2xl p-4 flex-1 text-center">
+             <div className="text-2xl font-black text-white">{user.workoutsCompleted}</div>
+             <div className="text-xs text-gray-400 font-medium uppercase">Sesiones</div>
+           </div>
+           <div className="bg-gray-800 rounded-2xl p-4 flex-1 text-center">
+             <div className="text-2xl font-black text-white">{(user.workoutsCompleted % 3) + 1}/3</div>
+             <div className="text-xs text-gray-400 font-medium uppercase">Día Semanal</div>
+           </div>
+        </div>
+
+        {!restStatus.isReady ? (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-5 text-center">
+            <ShieldAlert className="mx-auto text-red-500 mb-2" size={32} />
+            <h3 className="font-bold text-red-400 mb-1">Bloqueo de Recuperación</h3>
+            <p className="text-sm text-gray-300 mb-3">El SNC necesita 48h para recuperarse en calistenia avanzada.</p>
+            <div className="text-xl font-black text-white">{restStatus.hoursLeft}h <span className="text-sm font-normal text-gray-400">restantes</span></div>
+            {/* Botón oculto para desarrollo/prueba, en prod debería estar bloqueado */}
+            <button onClick={onStart} className="mt-4 text-xs text-gray-500 underline">Forzar Inicio (No recomendado)</button>
+          </div>
+        ) : (
+          <button 
+            onClick={onStart}
+            className="w-full bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-black uppercase tracking-widest py-4 rounded-2xl transition-all active:scale-95 shadow-[0_0_20px_rgba(16,185,129,0.3)] flex justify-center items-center gap-2"
+          >
+            Comenzar Entrenamiento <Play size={20} fill="currentColor" />
+          </button>
+        )}
+      </div>
+
+      <div className="bg-gray-900 rounded-3xl p-6 border border-gray-800">
+         <h3 className="font-bold text-white mb-4 flex items-center gap-2"><Info size={18} className="text-emerald-500"/> Reglas del Sistema</h3>
+         <ul className="space-y-3 text-sm text-gray-400">
+           <li className="flex gap-2"><CheckCircle size={16} className="text-gray-600 flex-shrink-0 mt-0.5"/> 3 días por semana estricto.</li>
+           <li className="flex gap-2"><CheckCircle size={16} className="text-gray-600 flex-shrink-0 mt-0.5"/> 48 horas de descanso obligatorio entre sesiones.</li>
+           <li className="flex gap-2"><CheckCircle size={16} className="text-gray-600 flex-shrink-0 mt-0.5"/> Descarga automática cada 5 semanas.</li>
+           <li className="flex gap-2"><CheckCircle size={16} className="text-gray-600 flex-shrink-0 mt-0.5"/> Calidad sobre cantidad: Registro de técnica estricto.</li>
+         </ul>
+      </div>
+    </div>
+  );
+}
+
+const PHASES_ORDER = ['warmup', 'skill', 'strength', 'core', 'prehab'];
+const PHASE_NAMES = { warmup: 'Calentamiento', skill: 'Habilidad', strength: 'Fuerza Principal', core: 'Core', prehab: 'Prehab' };
+
+function WorkoutEngine({ workoutData, isDeload, onComplete, onAbort }) {
+  const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
+  const [activeExercise, setActiveExercise] = useState(null);
+  const [logs, setLogs] = useState({});
+
+  const sectionsAvailable = PHASES_ORDER.filter(s => workoutData.routine[s] && workoutData.routine[s].length > 0);
+  const currentSectionKey = sectionsAvailable[currentSectionIndex];
+  const exercises = workoutData.routine[currentSectionKey] || [];
+
+  const handleExerciseComplete = (exerciseId, exerciseLogs) => {
+    setLogs(prev => ({ ...prev, [exerciseId]: exerciseLogs }));
+    setActiveExercise(null);
+  };
+
+  const advanceSection = () => {
+    // Validar que se completaron todos los ejercicios de la sección actual (simplificado: al menos se abrió o se ignoró temporalmente, en un app real obligaríamos)
+    if (currentSectionIndex < sectionsAvailable.length - 1) {
+      setCurrentSectionIndex(prev => prev + 1);
+    } else {
+      onComplete(logs);
+    }
+  };
+
+  if (activeExercise) {
+    return (
+      <ExerciseLogger 
+        exercise={activeExercise} 
+        onSave={(exLogs) => handleExerciseComplete(activeExercise.id, exLogs)} 
+        onCancel={() => setActiveExercise(null)}
+      />
+    );
+  }
+
+  return (
+    <div className="animate-fade-in space-y-4">
+      <div className="flex justify-between items-center mb-6">
+         <button onClick={onAbort} className="text-gray-400 hover:text-white"><X size={24}/></button>
+         <div className="flex gap-1">
+           {sectionsAvailable.map((s, idx) => (
+             <div key={s} className={`h-1.5 w-8 rounded-full ${idx === currentSectionIndex ? 'bg-emerald-500' : idx < currentSectionIndex ? 'bg-emerald-500/30' : 'bg-gray-800'}`} />
+           ))}
+         </div>
+      </div>
+
+      <div className="mb-8">
+        <h2 className="text-3xl font-black text-white uppercase tracking-tight">{PHASE_NAMES[currentSectionKey]}</h2>
+        <p className="text-gray-400 text-sm mt-1">Fase {currentSectionIndex + 1} de {sectionsAvailable.length}. No te saltes pasos.</p>
+      </div>
+
+      <div className="space-y-3">
+        {exercises.map((ex, idx) => {
+          const isCompleted = !!logs[ex.id];
+          return (
+            <button 
+              key={ex.id} 
+              onClick={() => setActiveExercise(ex)}
+              className={`w-full text-left p-4 rounded-2xl border transition-all flex justify-between items-center group
+                ${isCompleted ? 'bg-gray-900 border-gray-800 opacity-60' : 'bg-gray-800 border-gray-700 hover:border-emerald-500'}`}
+            >
+              <div>
+                 <h4 className={`font-bold ${isCompleted ? 'text-gray-500 line-through' : 'text-white'}`}>{idx + 1}. {ex.name}</h4>
+                 {ex.sets && (
+                   <p className="text-sm text-emerald-500/80 font-medium mt-1">
+                     {ex.sets} Sets x {ex.minReps && ex.maxReps ? `${ex.minReps}-${ex.maxReps}` : ex.reps || ex.duration} {ex.unit || ''}
+                   </p>
+                 )}
+              </div>
+              {isCompleted ? <CheckCircle className="text-emerald-500" size={24}/> : <ChevronRight className="text-gray-500 group-hover:text-emerald-500 transition-colors" size={24}/>}
+            </button>
+          )
+        })}
+      </div>
+
+      <button 
+        onClick={advanceSection}
+        className="w-full mt-8 bg-white text-gray-950 font-black uppercase py-4 rounded-2xl hover:bg-gray-200 transition-colors"
+      >
+        {currentSectionIndex < sectionsAvailable.length - 1 ? 'Siguiente Fase' : 'Finalizar Entrenamiento'}
+      </button>
+    </div>
+  );
+}
+
+// --- LÓGICA DE ALARMA (SONIDO Y VIBRACIÓN) ---
+const playAlarm = () => {
+  // 1. Vibración fuerte (patrón: vibra 600ms, pausa 200ms, repite)
+  if (typeof navigator !== 'undefined' && navigator.vibrate) {
+    navigator.vibrate([600, 200, 600, 200, 600]);
+  }
+  
+  // 2. Sonido tipo reloj/alarma usando el sintetizador web del navegador
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    osc.type = 'square';
+    // Generar pitido doble (agudo)
+    osc.frequency.setValueAtTime(800, ctx.currentTime);
+    osc.frequency.setValueAtTime(1200, ctx.currentTime + 0.15);
+    osc.frequency.setValueAtTime(800, ctx.currentTime + 0.3);
+    osc.frequency.setValueAtTime(1200, ctx.currentTime + 0.45);
+    
+    gain.gain.setValueAtTime(0.1, ctx.currentTime); // Control de volumen
+    
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.6);
+  } catch (e) {
+    console.warn("El navegador bloqueó el audio o no está soportado", e);
+  }
+};
+
+// Lógica compleja del Logger exigida
+function ExerciseLogger({ exercise, onSave, onCancel }) {
+  const [currentSet, setCurrentSet] = useState(1);
+  const [setLogs, setSetLogs] = useState([]);
+  const [repInput, setRepInput] = useState('');
+  const [angleInput, setAngleInput] = useState('Anillas a cintura');
+  const [techFailure, setTechFailure] = useState(false);
+  const [errorToast, setErrorToast] = useState('');
+  const [isResting, setIsResting] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(0);
+
+  // Nuevos estados para el cronómetro de ejercicio
+  const [stopwatchTime, setStopwatchTime] = useState(0);
+  const [isStopwatchRunning, setIsStopwatchRunning] = useState(false);
+
+  const isTimed = exercise.unit === 's' || exercise.duration;
+  const totalSets = exercise.sets || 1;
+
+  // Calcular el tiempo objetivo en segundos para la alarma del cronómetro
+  let targetSeconds = 0;
+  if (exercise.unit === 's' && exercise.minReps) {
+    targetSeconds = exercise.minReps;
+  } else if (exercise.duration) {
+    const match = exercise.duration.match(/(\d+)\s*min/);
+    if (match) targetSeconds = parseInt(match[1]) * 60;
+    else targetSeconds = parseInt(exercise.duration) || 0;
+  }
+
+  useEffect(() => {
+    let timer;
+    if (isResting && timeLeft > 0) {
+      timer = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
+    } else if (isResting && timeLeft === 0) {
+      playAlarm(); // <-- ALARMA DE FIN DE DESCANSO
+      setIsResting(false);
+      if (currentSet < totalSets) {
+         setCurrentSet(prev => prev + 1);
+         setRepInput('');
+         setTechFailure(false);
+         setStopwatchTime(0);
+      } else {
+         onSave(setLogs); // Auto save after last rest
+      }
+    }
+    return () => clearInterval(timer);
+  }, [isResting, timeLeft, currentSet, totalSets]);
+
+  useEffect(() => {
+    let interval;
+    if (isStopwatchRunning) {
+      interval = setInterval(() => {
+        setStopwatchTime(prev => {
+          const nextTime = prev + 1;
+          if (targetSeconds > 0 && nextTime === targetSeconds) {
+            playAlarm(); // <-- ALARMA DE TIEMPO DE EJERCICIO COMPLETADO
+          }
+          return nextTime;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isStopwatchRunning, targetSeconds]);
+
+  const handleStopwatchToggle = () => {
+    if (isStopwatchRunning) {
+       setIsStopwatchRunning(false);
+       setRepInput(stopwatchTime.toString());
+    } else {
+       setIsStopwatchRunning(true);
+    }
+  };
+
+  const handleLogSet = () => {
+    const val = parseInt(repInput);
+    if (isNaN(val) && !exercise.duration) return;
+
+    // Validación estricta de topes (Regla 2)
+    if (exercise.maxReps && val > exercise.maxReps) {
+      setErrorToast(`Has dominado el rango (${exercise.maxReps}). Aumenta dificultad mecánica para la próxima sesión.`);
+      setTimeout(() => setErrorToast(''), 4000);
+      return; // Bloquea el guardado
+    }
+
+    const newLog = {
+      set: currentSet,
+      value: val || exercise.duration,
+      angle: exercise.requiresAngle ? angleInput : null,
+      techFailure
+    };
+
+    const newLogs = [...setLogs, newLog];
+    setSetLogs(newLogs);
+
+    // Si hubo fallo técnico absoluto, el sistema marca el límite (Regla 3)
+    // En la app real esto modificaría la sugerencia de la próxima semana
+    
+    if (currentSet < totalSets) {
+       setIsResting(true);
+       setTimeLeft(exercise.rest || 60);
+    } else {
+       onSave(newLogs);
+    }
+  };
+
+  if (isResting) {
+    const mins = Math.floor(timeLeft / 60);
+    const secs = timeLeft % 60;
+    return (
+      <div className="flex flex-col items-center justify-center h-[75vh] animate-fade-in text-center">
+         <Clock size={64} className="text-emerald-500 mb-6 animate-pulse" />
+         <h2 className="text-2xl font-black text-gray-400 uppercase tracking-widest mb-2">Recuperación</h2>
+         <div className="text-7xl font-black text-white tabular-nums tracking-tighter mb-8">
+           {mins}:{secs < 10 ? '0':''}{secs}
+         </div>
+         
+         {/* Información del siguiente set */}
+         <div className="bg-gray-800 p-5 rounded-2xl w-full max-w-sm border border-gray-700 shadow-lg mb-8 text-left">
+            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Preparando Siguiente</h4>
+            <p className="text-xl font-black text-white leading-tight mb-1">{exercise.name}</p>
+            <p className="text-emerald-500 font-bold mb-3 text-sm">Set {currentSet + 1} de {totalSets}</p>
+            {exercise.cue && (
+              <div className="bg-gray-900 p-3 rounded-lg border-l-2 border-emerald-500">
+                <p className="text-sm text-gray-300">🎯 <span className="font-bold text-emerald-400">Foco:</span> {exercise.cue}</p>
+              </div>
+            )}
+         </div>
+
+         <button onClick={() => setTimeLeft(0)} className="px-6 py-2 rounded-full bg-gray-800 text-gray-400 text-sm font-bold hover:bg-gray-700 transition-colors">Saltar descanso</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="animate-fade-in flex flex-col h-full">
+      <div className="flex justify-between items-center mb-6">
+         <button onClick={onCancel} className="text-gray-400 hover:text-white"><ChevronRight className="rotate-180"/></button>
+         <span className="font-bold text-gray-400">Set {currentSet} / {totalSets}</span>
+      </div>
+
+      <h2 className="text-3xl font-black text-white uppercase tracking-tight leading-none mb-2">{exercise.name}</h2>
+      
+      {exercise.cue && (
+        <div className="bg-emerald-500/10 border-l-2 border-emerald-500 p-3 mb-6">
+           <p className="text-sm text-emerald-400 font-medium">🎯 Foco: {exercise.cue}</p>
+        </div>
+      )}
+
+      {errorToast && (
+        <div className="bg-red-500/20 border border-red-500 text-red-200 p-3 rounded-lg mb-4 text-sm font-bold flex gap-2 items-start">
+          <AlertTriangle size={18} className="shrink-0 mt-0.5" /> {errorToast}
+        </div>
+      )}
+
+      <div className="space-y-6 flex-1">
+        {/* Cronómetro para ejercicios de tiempo */}
+        {isTimed && (
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 text-center shadow-inner">
+            <div className="flex items-center justify-center gap-2 mb-2 text-gray-400">
+              <Timer size={18} /> <span className="text-sm font-bold uppercase tracking-wider">Cronómetro Activo</span>
+            </div>
+            <div className="text-6xl font-black text-white tabular-nums mb-6 tracking-tighter">
+              {Math.floor(stopwatchTime / 60)}:{(stopwatchTime % 60).toString().padStart(2, '0')}
+            </div>
+            <div className="flex justify-center gap-3">
+               <button 
+                 onClick={handleStopwatchToggle} 
+                 className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-black uppercase tracking-wide transition-all ${isStopwatchRunning ? 'bg-red-500/20 text-red-500 border border-red-500/50' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 hover:bg-emerald-500/30'}`}
+               >
+                 {isStopwatchRunning ? <><Pause size={18}/> Pausar</> : <><Play size={18}/> Iniciar</>}
+               </button>
+               <button 
+                 onClick={() => { setStopwatchTime(0); setIsStopwatchRunning(false); setRepInput(''); }} 
+                 className="px-5 py-3 rounded-xl font-bold uppercase tracking-wide bg-gray-800 text-gray-400 border border-gray-700 hover:bg-gray-700 transition-colors"
+               >
+                 Reset
+               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Input Principal */}
+        {(!exercise.duration || isTimed) && (
+          <div>
+            <label className="block text-sm font-bold text-gray-400 mb-2 uppercase tracking-wide">
+              {isTimed ? 'Segundos completados' : 'Repeticiones'} {exercise.minReps && exercise.maxReps ? `(Meta: ${exercise.minReps}-${exercise.maxReps})` : ''}
+            </label>
+            <input 
+              type="number" 
+              value={repInput} 
+              onChange={e => setRepInput(e.target.value)}
+              className="w-full bg-gray-900 border-2 border-gray-700 rounded-2xl p-4 text-center text-4xl font-black text-white focus:border-emerald-500 focus:outline-none transition-colors"
+              placeholder="0"
+            />
+          </div>
+        )}
+
+        {/* Validación de Ángulo (Regla 1) */}
+        {exercise.requiresAngle && (
+          <div className="bg-gray-800 p-4 rounded-2xl">
+            <label className="block text-sm font-bold text-gray-400 mb-2 uppercase tracking-wide">Altura/Ángulo Actual</label>
+            <select 
+              value={angleInput} 
+              onChange={e => setAngleInput(e.target.value)}
+              className="w-full bg-gray-900 border border-gray-700 rounded-xl p-3 text-white focus:border-emerald-500 focus:outline-none appearance-none"
+            >
+              <option>Anillas a altura de cabeza</option>
+              <option>Anillas a pecho</option>
+              <option>Anillas a cintura</option>
+              <option>Anillas a rodillas</option>
+              <option>Pies elevados</option>
+            </select>
+          </div>
+        )}
+
+        {/* Botón de Fallo Técnico (Regla 3) */}
+        {exercise.errorMsg && (
+          <div className="bg-gray-800 p-4 rounded-2xl border border-gray-700">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input 
+                type="checkbox" 
+                checked={techFailure}
+                onChange={e => setTechFailure(e.target.checked)}
+                className="mt-1 w-5 h-5 rounded border-gray-600 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-gray-900 bg-gray-900" 
+              />
+              <div>
+                <span className="block text-sm font-bold text-white mb-1">¿Rompiste la técnica perfecta?</span>
+                <span className="block text-xs text-gray-400 italic">Error detectado: {exercise.errorMsg}</span>
+              </div>
+            </label>
+          </div>
+        )}
+      </div>
+
+      <button 
+        onClick={handleLogSet}
+        disabled={!repInput && !exercise.duration}
+        className="mt-8 w-full bg-emerald-500 disabled:bg-gray-800 disabled:text-gray-500 text-gray-950 font-black uppercase tracking-widest py-4 rounded-2xl transition-all"
+      >
+        Registrar Set
+      </button>
+    </div>
+  );
+}
+
+function SettingsView({ onExport, onImport, history, onReset }) {
+  const fileInputRef = useRef(null);
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <h2 className="text-2xl font-black text-white uppercase tracking-tight mb-6">Ajustes y Datos</h2>
+      
+      <div className="bg-gray-900 rounded-2xl p-6 border border-gray-800">
+        <h3 className="font-bold text-white mb-2">Resguardo de Progreso</h3>
+        <p className="text-sm text-gray-400 mb-6">La app guarda localmente. Exporta tu progreso si cambias de celular.</p>
+        
+        <div className="space-y-3">
+          <button 
+            onClick={onExport}
+            className="w-full bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors"
+          >
+            <Download size={18} /> Descargar Copia (JSON)
+          </button>
+          
+          <button 
+            onClick={() => fileInputRef.current.click()}
+            className="w-full border border-gray-700 hover:bg-gray-800 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors"
+          >
+            <Upload size={18} /> Restaurar Progreso
+          </button>
+          <input type="file" accept=".json" className="hidden" ref={fileInputRef} onChange={onImport} />
+        </div>
+      </div>
+
+      <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-6">
+        <h3 className="font-bold text-red-400 mb-2 flex items-center gap-2"><Trash2 size={18}/> Zona de Peligro</h3>
+        <p className="text-sm text-gray-400 mb-4">Borrar todo tu historial y volver al primer día.</p>
+        <button 
+          onClick={onReset}
+          className="w-full bg-red-500/20 hover:bg-red-500/40 text-red-400 border border-red-500/50 font-bold py-3 px-4 rounded-xl transition-colors"
+        >
+          Reiniciar Progreso
+        </button>
+      </div>
+
+      <div className="bg-gray-900 rounded-2xl p-6 border border-gray-800">
+         <h3 className="font-bold text-white mb-4">Historial Reciente</h3>
+         {history.length === 0 ? (
+           <p className="text-sm text-gray-500">Aún no hay entrenamientos registrados.</p>
+         ) : (
+           <div className="space-y-3">
+             {[...history].reverse().slice(0, 5).map((h, i) => (
+               <div key={i} className="flex justify-between items-center border-b border-gray-800 pb-2">
+                 <div>
+                   <span className="block text-sm font-bold text-white">Fase {h.phase} - Sem {h.week}</span>
+                   <span className="block text-xs text-gray-500">{new Date(h.date).toLocaleDateString()}</span>
+                 </div>
+                 <CheckCircle className="text-emerald-500" size={16}/>
+               </div>
+             ))}
+           </div>
+         )}
+      </div>
+    </div>
+  );
+}
