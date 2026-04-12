@@ -3,750 +3,483 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>RingsPro - Calistenia</title>
-    
-    <!-- Tailwind CSS -->
+    <title>Calistenia Pro</title>
+    <!-- Tailwind CSS para estilos rápidos y responsivos -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome para Iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- React & ReactDOM -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    
-    <!-- Babel (Para compilar JSX en el navegador) -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
     <style>
-        /* Pequeños ajustes para la PWA */
-        body { -webkit-tap-highlight-color: transparent; }
-        .animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
+        /* Estilos base y utilidades para PWA */
+        body {
+            background-color: #0f172a; /* Slate 900 */
+            color: #f8fafc; /* Slate 50 */
+            -webkit-tap-highlight-color: transparent;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow-x: hidden;
+        }
+        
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Animaciones para transiciones de pantalla */
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Círculo del timer */
+        .timer-circle {
+            transition: stroke-dashoffset 1s linear;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+
+        /* Ocultar scrollbar pero permitir scroll */
+        ::-webkit-scrollbar { width: 0px; background: transparent; }
     </style>
 </head>
-<body class="bg-gray-950 text-gray-100 font-sans selection:bg-emerald-500 selection:text-white pb-20">
-    
-    <div id="root"></div>
+<body class="h-screen w-screen flex flex-col relative">
 
-    <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+    <!-- BARRA SUPERIOR -->
+    <header class="glass-panel p-4 sticky top-0 z-50 flex justify-between items-center shadow-md">
+        <div class="flex items-center gap-2">
+            <i class="fa-solid fa-dumbbell text-blue-500 text-xl"></i>
+            <h1 class="font-bold text-lg tracking-wide">Cali<span class="text-blue-500">Pro</span></h1>
+        </div>
+        <button id="btn-rules" class="text-slate-300 hover:text-white transition">
+            <i class="fa-solid fa-shield-halved"></i> Reglas
+        </button>
+    </header>
 
-        // --- ICONOS SVG COMPONENTIZADOS ---
-        const Play = ({size=24, className="", fill="none"}) => <svg width={size} height={size} viewBox="0 0 24 24" fill={fill} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>;
-        const Pause = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>;
-        const CheckCircle = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>;
-        const AlertTriangle = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>;
-        const Clock = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>;
-        const ChevronRight = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="9 18 15 12 9 6"></polyline></svg>;
-        const X = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>;
-        const Download = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>;
-        const Upload = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>;
-        const ShieldAlert = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>;
-        const Activity = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>;
-        const Dumbbell = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m14.4 14.4 5.2 5.2a2 2 0 0 1-2.8 2.8l-5.2-5.2"></path><path d="m9.6 9.6-5.2-5.2a2 2 0 0 1 2.8-2.8l5.2 5.2"></path><path d="m14 10-4 4"></path><path d="m17 7-3 3"></path><path d="m10 14-3 3"></path><path d="m21 11-2-2-4 4 2 2z"></path><path d="m13 3-2-2-4 4 2 2z"></path></svg>;
-        const HistoryIcon = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M12 7v5l4 2"></path></svg>;
-        const RefreshCcw = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 2v6h6"></path><path d="M21 12A9 9 0 0 0 6 5.3L3 8"></path><path d="M21 22v-6h-6"></path><path d="M3 12a9 9 0 0 0 15 6.7l3-2.7"></path></svg>;
-        const Info = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>;
-        const Trash2 = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>;
-        const Timer = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="10" y1="2" x2="14" y2="2"></line><line x1="12" y1="14" x2="15" y2="11"></line><circle cx="12" cy="14" r="8"></circle></svg>;
-        const BookOpen = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>;
-        const Zap = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>;
-        const Flame = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"></path></svg>;
+    <!-- CONTENEDOR PRINCIPAL -->
+    <main id="app-content" class="flex-1 overflow-y-auto p-4 pb-24 fade-in">
+        <!-- Vistas se renderizan aquí dinámicamente -->
+    </main>
 
-        // --- BASE DE DATOS DE EJERCICIOS Y PERIODIZACIÓN (NUEVA RUTINA) ---
-        const WORKOUT_DB = {
-          warmup: [
-            { id: 'w1', name: 'Rotaciones articulares', duration: '1 min' },
-            { id: 'w2', name: 'Gato-Camello', sets: 1, reps: 10, rest: 30 },
-            { id: 'w3', name: 'Plancha abdominal', sets: 1, minReps: 30, unit: 's', rest: 30 },
-            { id: 'w4', name: 'Escápulas en barra', sets: 1, reps: 10, rest: 30, cue: 'Colgarse y retraer escápulas sin doblar codos.' },
-            { id: 'w5', name: 'Flexiones c/ rodillas apoyadas', sets: 1, reps: 10, rest: 60 }
-          ],
-          routines: [
-            { // DÍA 1: Fuerza Máxima y Tensión
-              id: 1,
-              name: "Fuerza Bruta",
-              strength: [
-                { id: 'd1_1', name: 'Dominadas c/lastre o Archer', sets: 4, minReps: 3, maxReps: 5, unit: 'reps', rest: 180, cue: 'Tirón Vertical: Adaptación neuronal.' },
-                { id: 'd1_2', name: 'Pike push-ups / HSPU asistidas', sets: 4, minReps: 4, maxReps: 6, unit: 'reps', rest: 180, cue: 'Empuje Vertical: Flexiones en pica profundas.' },
-                { id: 'd1_3', name: 'Remo invertido (Pies elevados)', sets: 3, minReps: 6, maxReps: 8, unit: 'reps', rest: 180, cue: 'Tirón Horizontal: Usa una barra baja o mesa.' },
-                { id: 'd1_4', name: 'Archer push-ups / 1 Mano asistida', sets: 3, minReps: 4, maxReps: 6, unit: 'reps', rest: 180, cue: 'Empuje Horizontal: Repeticiones POR BRAZO.' }
-              ],
-              core: [
-                { id: 'd1_5', name: 'Toes to bar / Knee raises', sets: 3, minReps: 6, maxReps: 8, unit: 'reps', rest: 180, cue: 'Colgado de la barra. Evita balanceo.' }
-              ]
+    <!-- MODAL DE REGLAS DE ORO -->
+    <div id="modal-rules" class="fixed inset-0 bg-black/80 z-[60] hidden flex items-center justify-center p-4 opacity-0 transition-opacity">
+        <div class="glass-panel p-6 rounded-2xl max-w-sm w-full max-h-[80vh] overflow-y-auto">
+            <h2 class="text-xl font-bold mb-4 text-blue-400 border-b border-blue-400/30 pb-2">Reglas de Oro</h2>
+            <ul class="space-y-4 text-sm text-slate-200">
+                <li><strong class="text-red-400"><i class="fa-solid fa-triangle-exclamation"></i> Seguridad Muñecas:</strong> Queda estrictamente prohibido el empuje con palma abierta en el suelo. Usar anillas (neutro) o nudillos sobre superficie acolchada.</li>
+                <li><strong class="text-yellow-400"><i class="fa-solid fa-person-rays"></i> Seguridad Lumbar:</strong> En abdomen o planchas, aplicar retroversión pélvica (apretar glúteos, borrar curva lumbar).</li>
+                <li><strong class="text-green-400"><i class="fa-solid fa-stopwatch"></i> Descanso Bloques:</strong> Al cambiar a un ejercicio distinto (ej. Dominadas a Lagartijas), descansar 3-5 minutos para limpiar ácido láctico.</li>
+            </ul>
+            <button id="btn-close-rules" class="w-full mt-6 bg-slate-700 hover:bg-slate-600 py-3 rounded-xl font-bold">Entendido</button>
+        </div>
+    </div>
+
+    <!-- LOGICA DE LA APP (Todo en JS) -->
+    <script>
+        // --- 1. BASE DE DATOS DE LA RUTINA ---
+        const routineData = {
+            warmup: {
+                id: 'warmup', title: "Módulo de Calentamiento", time: "5-10 min",
+                desc: "Obligatorio previo a cada sesión.", icon: "fa-fire", color: "text-orange-500", bg: "bg-orange-500",
+                exercises: [
+                    { id: "w1", name: "Movilidad Articular", technique: "Círculos lentos y amplios de cuello, hombros, codos y muñecas.", repsLabel: "1 min por articulación", sets: 1, rest: 0 },
+                    { id: "w2", name: "Activación Escapular", technique: "Colgado con brazos estirados. Sube y baja usando solo omóplatos. Brazos bloqueados.", repsLabel: "10 repeticiones", sets: 2, rest: 45 },
+                    { id: "w3", name: "Plancha Frontal (Anillas/Puños)", technique: "Posición alta de lagartija empujando fuerte hacia abajo (protracción).", repsLabel: "30 segundos", sets: 1, rest: 0 }
+                ]
             },
-            { // DÍA 2: Resistencia e Hipertrofia
-              id: 2,
-              name: "Hipertrofia",
-              strength: [
-                { id: 'd2_1', name: 'Fondos paralelas / Flex. declinadas', sets: 3, minReps: 12, maxReps: 15, unit: 'reps', rest: 90, cue: 'Empuje General.' },
-                { id: 'd2_2', name: 'Dominadas supinas (Chin-ups)', sets: 3, minReps: 8, maxReps: 15, unit: 'reps', rest: 90, cue: 'Tirón General. RIR 2: NO llegues al fallo total.' },
-                { id: 'd2_3', name: 'Flexiones estándar', sets: 3, minReps: 15, maxReps: 25, unit: 'reps', rest: 90, cue: 'Empuje Horizontal. Acumula estrés metabólico.' },
-                { id: 'd2_4', name: 'Remo invertido estándar', sets: 3, minReps: 12, maxReps: 15, unit: 'reps', rest: 90, cue: 'Tirón Horizontal. Pies en el suelo.' }
-              ],
-              core: [
-                { id: 'd2_5', name: 'Hollow Body Hold (Canoa)', sets: 3, minReps: 45, maxReps: 60, unit: 's', rest: 90 },
-                { id: 'd2_6', name: 'Plancha lateral', sets: 3, minReps: 45, maxReps: 45, unit: 's', rest: 90, cue: 'Mantén 45s POR LADO.' }
-              ]
+            day1: {
+                id: 'day1', title: "Día 1: Fuerza y Potencia", time: "Fibras rápidas",
+                desc: "Calidad sobre cantidad. Detén la serie si pierdes técnica.", icon: "fa-bolt", color: "text-yellow-400", bg: "bg-yellow-500",
+                exercises: [
+                    { id: "d1e1", name: "Dominadas Explosivas", technique: "Agarre prono al ancho de hombros. Tracciona explosivo buscando que la barra golpee bajo el pecho. Bajada rápida pero controlada.", 
+                      progression: ["5x3", "5x4", "5x5"], rest: 180, setsProgression: true },
+                    { id: "d1e2", name: "Pike Push-ups", technique: "Cuerpo en 'V' invertida. Codos atrás a 45°. Cabeza toca delante de las manos (triángulo). En anillas: a 20-30cm del suelo.", 
+                      progression: ["4x8", "4x9", "4x10", "4x11", "4x12", "4x12 (Pies en cajón)"], rest: 120, setsProgression: true },
+                    { id: "d1e3", name: "Elevaciones L-Sit / Rodillas", technique: "Colgado. Enrollar pelvis. Elevar piernas rectas (L-Sit) o rodillas al pecho.", 
+                      progression: ["4 series de 15s", "4 series de 20s", "4 series de 25s", "4 series de 30s"], rest: 90, setsProgression: true },
+                    { id: "d1e4", name: "Dominadas Negativas", technique: "Saltar a posición alta. Bajar lo más lento posible manteniendo tensión. No caerse al final.", 
+                      progression: ["3x5 (Bajada 5s)", "3x5 (Bajada 6s)", "3x5 (Bajada 8s)", "3x5 (Bajada 10s)"], rest: 120, setsProgression: true }
+                ]
             },
-            { // DÍA 3: Enfoque Mixto
-              id: 3,
-              name: "Potencia & Control",
-              strength: [
-                { id: 'd3_1', name: 'Dominadas explosivas', sets: 3, minReps: 4, maxReps: 6, unit: 'reps', rest: 120, cue: 'Potencia: La barra debe tocar tu pecho rápido.' },
-                { id: 'd3_2', name: 'Flexiones con aplauso', sets: 3, minReps: 6, maxReps: 8, unit: 'reps', rest: 120, cue: 'Potencia: Movimiento pliométrico.' },
-                { id: 'd3_3', name: 'Dominadas isométricas', sets: 3, minReps: 15, maxReps: 60, unit: 's', rest: 120, cue: 'Control: Barbilla sobre la barra. Máximo tiempo posible.' },
-                { id: 'd3_4', name: 'Flexiones excéntricas lentas', sets: 3, minReps: 8, maxReps: 10, unit: 'reps', rest: 120, cue: 'Control: Baja en 4 segundos, sube normal.' }
-              ],
-              core: [
-                { id: 'd3_5', name: 'L-Sit / Rodillas encogidas', sets: 4, minReps: 10, maxReps: 60, unit: 's', rest: 120, cue: 'Máximo tiempo posible.' }
-              ]
+            day2: {
+                id: 'day2', title: "Día 2: Resistencia Metabólica", time: "Método Escalera",
+                desc: "100 repeticiones. Resistencia profunda.", icon: "fa-heart-pulse", color: "text-red-500", bg: "bg-red-500",
+                exercises: [
+                    { id: "d2e1", name: "Escalera Dominadas", technique: "Rotar agarre cada 2 series: 1. Prona, 2. Supina, 3. Comando (mixto), 4. Ancha, 5. Anillas (rotación natural).", 
+                      progression: ["10 series x 3 reps", "10x4 reps", "10x5 reps", "10x6 reps", "10x7 reps", "10x8 reps", "10x10 reps"], rest: 90, setsProgression: true },
+                    { id: "d2e2", name: "Escalera Lagartijas", technique: "Rotar cada 2-3 series. Codos a 45°. Variaciones: Neutras, Diamante, Arqueras, Profundas (Anillas).", 
+                      progression: ["10 series x 3 reps", "10x4 reps", "10x5 reps", "10x6 reps", "10x7 reps", "10x8 reps", "10x10 reps"], rest: 90, setsProgression: true },
+                    { id: "d2e3", name: "Abdominales 4-Way", technique: "Colgado. 1 serie es el circuito: 1. A la Izq, 2. A la Der, 3. Cruzados, 4. Centro.", 
+                      progression: ["3 Series (Rodillas)", "3 Series (Piernas Rectas)"], rest: 60, setsProgression: true },
+                    { id: "d2e4", name: "Extensiones Superman", technique: "Boca abajo. Apretar glúteos, elevar pecho, brazos y muslos. Mirada al suelo.", 
+                      progression: ["3 series de 20s estático", "3x25s", "3x30s", "3x40s", "3x45s"], rest: 60, setsProgression: true }
+                ]
+            },
+            day3: {
+                id: 'day3', title: "Día 3: Estabilidad e Hipertrofia", time: "Híbrido Anillas",
+                desc: "Desarrollo estabilizador y corrección de asimetrías.", icon: "fa-rings-wedding", color: "text-purple-400", bg: "bg-purple-500",
+                exercises: [
+                    { id: "d3e1", name: "Soporte Isométrico Anillas", technique: "Sostenerse con codos bloqueados. Empujar hacia abajo (depresión escapular).", 
+                      progression: ["3 series de 20s", "3x25s", "3x30s", "3x35s", "3x40s", "3x45s", "3x45s (Palmas Afuera - RTO)"], rest: 90, setsProgression: true },
+                    { id: "d3e2", name: "Remos en Anillas", technique: "Cuerpo recto. Traccionar hasta tocar costillas. Retracción máxima arriba.", 
+                      progression: ["4x8 reps", "4x9 reps", "4x10 reps", "4x11 reps", "4x12 reps", "4x12 (Cuerpo más horizontal)"], rest: 90, setsProgression: true },
+                    { id: "d3e3", name: "Lagartijas Anillas al Fallo", technique: "Agarre neutro. Bajar lidando con vibración. Fallo técnico (detener si se pierde postura).", 
+                      progression: ["4 series x Fallo Técnico"], rest: 120, setsProgression: true },
+                    { id: "d3e4", name: "Combo: Escápulas + Cuelgue", technique: "Fase 1: 10 encogimientos escapulares. Fase 2: Quedarse colgado (Dead Hang) relajado hasta que falle el agarre.", 
+                      progression: ["3 Series de Combo completo"], rest: 60, setsProgression: true },
+                    { id: "d3e5", name: "Superman Dinámico", technique: "Subir explosivo, mantener contracción 1s arriba, bajar controlado.", 
+                      progression: ["3 series x 15 reps"], rest: 60, setsProgression: true }
+                ]
             }
-          ]
         };
 
-        const getWorkoutForDay = (workoutsCompleted) => {
-            const dayOfWeekIndex = workoutsCompleted % 3;
-            const routineData = WORKOUT_DB.routines[dayOfWeekIndex];
-            return {
-                warmup: WORKOUT_DB.warmup,
-                strength: routineData.strength,
-                core: routineData.core,
-                _meta: { dayName: routineData.name, dayId: routineData.id }
-            };
+        // --- 2. GESTIÓN DE ESTADO Y PROGRESO ---
+        let userProgress = JSON.parse(localStorage.getItem('caliProProgress')) || {};
+        let activeWorkout = null;
+        let currentExIndex = 0;
+        let currentSet = 1;
+        let timerInterval = null;
+        let wakeLock = null;
+
+        // Inicializar progreso faltante
+        Object.keys(routineData).forEach(day => {
+            routineData[day].exercises.forEach(ex => {
+                if (ex.progression && userProgress[ex.id] === undefined) {
+                    userProgress[ex.id] = 0; // Index 0 del array progression
+                }
+            });
+        });
+        const saveProgress = () => localStorage.setItem('caliProProgress', JSON.stringify(userProgress));
+
+        // --- 3. UTILIDADES DE AUDIO Y VIBRACIÓN ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playTone(freq, type, duration) {
+            try {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                oscillator.type = type;
+                oscillator.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); // Volumen
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + duration);
+            } catch (e) { console.log("Audio no soportado"); }
+        }
+
+        function playBeep() { playTone(880, 'sine', 0.2); }
+        function playLongBeep() { playTone(660, 'square', 0.8); }
+        
+        function triggerVibration(pattern) {
+            if ("vibrate" in navigator) navigator.vibrate(pattern);
+        }
+
+        async function requestWakeLock() {
+            try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } 
+            catch (err) { console.log(`${err.name}, ${err.message}`); }
+        }
+        function releaseWakeLock() {
+            if (wakeLock !== null) { wakeLock.release(); wakeLock = null; }
+        }
+
+        // --- 4. RENDERIZADO DE VISTAS ---
+        const appContent = document.getElementById('app-content');
+
+        function renderHome() {
+            let html = `
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold mb-1">Tu Programa</h2>
+                    <p class="text-slate-400 text-sm">Selecciona la rutina de hoy</p>
+                </div>
+                <div class="space-y-4">
+            `;
+            
+            Object.keys(routineData).forEach(key => {
+                const block = routineData[key];
+                html += `
+                    <div class="glass-panel p-5 rounded-2xl flex items-center justify-between cursor-pointer hover:bg-slate-800 transition active:scale-95" onclick="startWorkoutInit('${key}')">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-full ${block.bg} bg-opacity-20 flex items-center justify-center">
+                                <i class="fa-solid ${block.icon} ${block.color} text-xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-lg">${block.title}</h3>
+                                <p class="text-xs text-slate-400"><i class="fa-regular fa-clock"></i> ${block.time}</p>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-slate-500"></i>
+                    </div>
+                `;
+            });
+
+            html += `</div>`;
+            appContent.innerHTML = html;
+        }
+
+        // --- FLUJO DE ENTRENAMIENTO ---
+        window.startWorkoutInit = (dayKey) => {
+            if (audioCtx.state === 'suspended') audioCtx.resume(); // Requerido por navegadores
+            requestWakeLock();
+            activeWorkout = routineData[dayKey];
+            currentExIndex = 0;
+            currentSet = 1;
+            renderExercise();
         };
 
-        const getPreviousExerciseLogs = (history, exerciseId) => {
-            for (let i = history.length - 1; i >= 0; i--) {
-                if (history[i].logs && history[i].logs[exerciseId]) {
-                    return history[i].logs[exerciseId];
+        window.quitWorkout = () => {
+            if(confirm("¿Seguro que deseas salir del entrenamiento actual?")) {
+                releaseWakeLock();
+                clearInterval(timerInterval);
+                renderHome();
+            }
+        };
+
+        function getSetsAndRepsInfo(ex) {
+            if (ex.progression) {
+                const currentLevelIdx = userProgress[ex.id];
+                const str = ex.progression[currentLevelIdx];
+                // Extraer numero de series si existe el formato "NxY" o "N series"
+                let totalSets = 1;
+                const matchSets = str.match(/^(\d+)x/i) || str.match(/^(\d+)\s*series/i);
+                if(matchSets) totalSets = parseInt(matchSets[1]);
+                else if (ex.sets) totalSets = ex.sets;
+                
+                return { label: str, totalSets };
+            }
+            return { label: ex.repsLabel, totalSets: ex.sets || 1 };
+        }
+
+        function renderExercise() {
+            clearInterval(timerInterval);
+            if (currentExIndex >= activeWorkout.exercises.length) {
+                renderFinished();
+                return;
+            }
+
+            const ex = activeWorkout.exercises[currentExIndex];
+            const info = getSetsAndRepsInfo(ex);
+            const totalSets = info.totalSets;
+            
+            // Que sigue
+            let nextText = "Fin del Entrenamiento";
+            if (currentSet < totalSets) nextText = `Mismo ejercicio (Serie ${currentSet + 1})`;
+            else if (currentExIndex + 1 < activeWorkout.exercises.length) nextText = activeWorkout.exercises[currentExIndex + 1].name;
+
+            let levelControls = '';
+            if (ex.progression) {
+                const lvl = userProgress[ex.id];
+                const maxLvl = ex.progression.length - 1;
+                levelControls = `
+                    <div class="mt-4 p-3 bg-slate-800 rounded-xl flex items-center justify-between border border-slate-700">
+                        <div>
+                            <p class="text-xs text-slate-400">Nivel de Progreso</p>
+                            <p class="font-bold text-sm text-blue-400">${info.label}</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="changeLevel('${ex.id}', -1)" class="w-8 h-8 rounded bg-slate-700 flex items-center justify-center ${lvl === 0 ? 'opacity-50' : 'active:bg-slate-600'}"><i class="fa-solid fa-minus"></i></button>
+                            <button onclick="changeLevel('${ex.id}', 1)" class="w-8 h-8 rounded bg-blue-600 flex items-center justify-center ${lvl === maxLvl ? 'opacity-50' : 'active:bg-blue-500'}"><i class="fa-solid fa-plus"></i></button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            appContent.innerHTML = `
+                <div class="fade-in h-full flex flex-col">
+                    <div class="flex justify-between items-center mb-4">
+                        <button onclick="quitWorkout()" class="text-slate-400 p-2"><i class="fa-solid fa-xmark text-xl"></i></button>
+                        <span class="text-xs font-bold uppercase tracking-widest text-slate-500">${activeWorkout.title}</span>
+                        <div class="w-8"></div>
+                    </div>
+
+                    <div class="flex-1 flex flex-col justify-center">
+                        <div class="text-center mb-6">
+                            <span class="inline-block px-3 py-1 bg-blue-500/20 text-blue-400 text-xs font-bold rounded-full mb-3">Ejercicio ${currentExIndex + 1} de ${activeWorkout.exercises.length}</span>
+                            <h2 class="text-3xl font-black leading-tight">${ex.name}</h2>
+                        </div>
+
+                        <div class="glass-panel p-5 rounded-2xl mb-6">
+                            <div class="flex justify-between border-b border-slate-700 pb-3 mb-3">
+                                <div>
+                                    <p class="text-xs text-slate-400">Objetivo</p>
+                                    <p class="font-bold text-lg">${ex.progression ? '' : info.label}</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-xs text-slate-400">Serie Actual</p>
+                                    <p class="font-bold text-lg text-blue-400">${currentSet} <span class="text-slate-500 text-sm">/ ${totalSets}</span></p>
+                                </div>
+                            </div>
+                            <p class="text-sm text-slate-300 leading-relaxed"><i class="fa-solid fa-circle-info text-blue-500 mr-1"></i> ${ex.technique}</p>
+                            ${levelControls}
+                        </div>
+
+                        <div class="glass-panel p-4 rounded-xl border-l-4 border-l-yellow-500 mb-6">
+                            <p class="text-xs text-slate-400">Siguiente</p>
+                            <p class="font-semibold text-sm truncate">${nextText}</p>
+                        </div>
+                    </div>
+
+                    <button onclick="finishSet()" class="w-full bg-blue-600 active:bg-blue-700 transition py-4 rounded-2xl font-black text-lg shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-check"></i> COMPLETAR SERIE
+                    </button>
+                </div>
+            `;
+        }
+
+        window.changeLevel = (exId, delta) => {
+            const ex = activeWorkout.exercises.find(e => e.id === exId);
+            let current = userProgress[exId];
+            let next = current + delta;
+            if (next >= 0 && next < ex.progression.length) {
+                userProgress[exId] = next;
+                saveProgress();
+                renderExercise(); // Re-render to show update
+            }
+        };
+
+        window.finishSet = () => {
+            triggerVibration(50);
+            const ex = activeWorkout.exercises[currentExIndex];
+            const info = getSetsAndRepsInfo(ex);
+            
+            if (currentSet < info.totalSets) {
+                // Hay más series
+                currentSet++;
+                if (ex.rest > 0) renderTimer(ex.rest, false);
+                else renderExercise(); // Sin descanso
+            } else {
+                // Pasar al siguiente ejercicio
+                currentSet = 1;
+                currentExIndex++;
+                
+                if (currentExIndex < activeWorkout.exercises.length) {
+                    // Descanso largo entre bloques (3 min sugerido en reglas) o el del ejercicio
+                    // La regla dice 3-5 min si es muy distinto. Daremos la opción al usuario.
+                    renderTimer(ex.rest > 0 ? ex.rest : 0, true);
+                } else {
+                    renderFinished(); // Fin rutina
                 }
             }
-            return null;
         };
 
-        // --- LÓGICA DE ALARMA (SONIDO Y VIBRACIÓN) ---
-        const playAlarm = () => {
-          if (typeof navigator !== 'undefined' && navigator.vibrate) {
-            navigator.vibrate([400, 100, 400, 100, 400, 100, 400]);
-          }
-          try {
-            const AudioContext = window.AudioContext || window.webkitAudioContext;
-            if (!AudioContext) return;
-            const ctx = new AudioContext();
-            const createPlink = (freq, startTime, duration) => {
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(freq, startTime);
-                gain.gain.setValueAtTime(0, startTime);
-                gain.gain.linearRampToValueAtTime(0.6, startTime + 0.01); 
-                gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration); 
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-                osc.start(startTime);
-                osc.stop(startTime + duration);
-            };
-            createPlink(987.77, ctx.currentTime, 0.3);
-            createPlink(1318.51, ctx.currentTime + 0.12, 0.5);
-          } catch (e) { console.warn("Audio bloqueado", e); }
-        };
+        function renderTimer(seconds, isBlockChange) {
+            if (seconds === 0) { renderExercise(); return; }
 
-        // --- COMPONENTES PRINCIPALES ---
-        function App() {
-          const [appState, setAppState] = useState({
-            user: { startDate: new Date().toISOString(), currentWeek: 1, workoutsCompleted: 0 },
-            history: [],
-            lastWorkoutDate: null
-          });
-          const [currentView, setCurrentView] = useState('home'); 
-          const [activeWorkout, setActiveWorkout] = useState(null);
-
-          useEffect(() => {
-            const saved = localStorage.getItem('calisthenics_data');
-            if (saved) {
-              try { setAppState(JSON.parse(saved)); } catch (e) { console.error("Error parsing save", e); }
-            }
-          }, []);
-
-          useEffect(() => {
-            localStorage.setItem('calisthenics_data', JSON.stringify(appState));
-          }, [appState]);
-
-          const checkRestStatus = () => {
-            if (!appState.lastWorkoutDate) return { isReady: true, hoursLeft: 0 };
-            const last = new Date(appState.lastWorkoutDate).getTime();
-            const now = new Date().getTime();
-            const diffHours = (now - last) / (1000 * 60 * 60);
-            return {
-              isReady: diffHours >= 48,
-              hoursLeft: Math.max(0, 48 - diffHours).toFixed(1)
-            };
-          };
-
-          const startWorkout = () => {
-            const routine = getWorkoutForDay(appState.user.workoutsCompleted);
-            setActiveWorkout({
-              routine,
-              currentSection: 'warmup',
-              exerciseLogs: {},
-              startTime: Date.now()
-            });
-            setCurrentView('workout');
-          };
-
-          const finishWorkout = (logs) => {
-            const newHistoryEntry = {
-              date: new Date().toISOString(),
-              week: appState.user.currentWeek,
-              logs
-            };
-
-            let newWeek = appState.user.currentWeek;
-            let completed = appState.user.workoutsCompleted + 1;
-            if (completed % 3 === 0) newWeek++; 
-
-            setAppState(prev => ({
-              ...prev,
-              user: { ...prev.user, currentWeek: newWeek, workoutsCompleted: completed },
-              history: [...prev.history, newHistoryEntry],
-              lastWorkoutDate: new Date().toISOString()
-            }));
+            let timeLeft = seconds;
+            let totalTime = seconds;
             
-            setActiveWorkout(null);
-            setCurrentView('home');
-          };
-
-          const handleExport = () => {
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appState));
-            const a = document.createElement('a');
-            a.setAttribute("href", dataStr);
-            a.setAttribute("download", "calistenia_backup.json");
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-          };
-
-          const handleImport = (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (event) => {
-              try {
-                const importedData = JSON.parse(event.target.result);
-                if (importedData.user && importedData.history) {
-                  setAppState(importedData);
-                  alert("Progreso restaurado con éxito.");
-                } else { alert("Archivo inválido."); }
-              } catch (err) { alert("Error al leer el archivo."); }
-            };
-            reader.readAsText(file);
-          };
-
-          const handleReset = () => {
-            if (window.confirm("¿Borrar todo el historial y volver al primer día? Esta acción NO se puede deshacer.")) {
-              const defaultState = {
-                user: { startDate: new Date().toISOString(), currentWeek: 1, workoutsCompleted: 0 },
-                history: [],
-                lastWorkoutDate: null
-              };
-              setAppState(defaultState);
+            // Si es cambio de bloque, sugerimos 180s mínimo por las reglas
+            if(isBlockChange && seconds < 180 && activeWorkout.id !== 'warmup') {
+                timeLeft = 180; totalTime = 180;
             }
-          };
 
-          return (
-            <div>
-              <header className="bg-gray-900 border-b border-gray-800 p-4 sticky top-0 z-10 flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center">
-                     <Dumbbell size={18} className="text-gray-950" />
-                  </div>
-                  <h1 className="font-black text-xl tracking-tighter uppercase text-white">Rings<span className="text-emerald-500">Pro</span></h1>
-                </div>
-                <div className="flex gap-4">
-                  <button onClick={() => setCurrentView('home')} className={`p-2 rounded-full ${currentView === 'home' ? 'text-emerald-500 bg-gray-800' : 'text-gray-400'}`}>
-                    <Activity size={20} />
-                  </button>
-                  <button onClick={() => setCurrentView('settings')} className={`p-2 rounded-full ${currentView === 'settings' ? 'text-emerald-500 bg-gray-800' : 'text-gray-400'}`}>
-                    <HistoryIcon size={20} />
-                  </button>
-                </div>
-              </header>
+            appContent.innerHTML = `
+                <div class="fade-in h-full flex flex-col justify-between">
+                    <div class="text-center pt-8">
+                        <p class="text-slate-400 text-sm font-bold uppercase tracking-widest mb-2">${isBlockChange ? 'DESCANSO ENTRE BLOQUES' : 'DESCANSO'}</p>
+                        <p class="text-xs text-yellow-400 px-6">${isBlockChange ? '<i class="fa-solid fa-triangle-exclamation"></i> Limpia el ácido láctico antes de cambiar de ejercicio.' : ''}</p>
+                    </div>
 
-              <main className="max-w-md mx-auto w-full p-4">
-                {currentView === 'home' && (
-                  <Dashboard user={appState.user} restStatus={checkRestStatus()} onStart={startWorkout} />
-                )}
-                
-                {currentView === 'workout' && activeWorkout && (
-                  <WorkoutEngine workoutData={activeWorkout} onComplete={finishWorkout} onAbort={() => setCurrentView('home')} history={appState.history} />
-                )}
-
-                {currentView === 'settings' && (
-                  <SettingsView onExport={handleExport} onImport={handleImport} history={appState.history} onReset={handleReset} />
-                )}
-              </main>
-            </div>
-          );
-        }
-
-        function Dashboard({ user, restStatus, onStart }) {
-          const nextRoutine = getWorkoutForDay(user.workoutsCompleted);
-
-          return (
-            <div className="space-y-6 animate-fade-in">
-              <div className="bg-gray-900 rounded-3xl p-6 border border-gray-800 shadow-xl relative overflow-hidden">
-                <div className="absolute -right-10 -top-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl"></div>
-                
-                <h2 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-1">Tu Programa</h2>
-                <div className="flex items-end gap-2 mb-4">
-                  <span className="text-4xl font-black text-white">Sem {user.currentWeek}</span>
-                  <span className="text-emerald-500 font-bold mb-1">/ Día {(user.workoutsCompleted % 3) + 1}</span>
-                </div>
-
-                <div className="bg-gray-800/50 border border-gray-700/50 p-4 rounded-xl mb-6">
-                    <p className="text-xs text-gray-400 uppercase font-bold tracking-wider mb-1">Sesión de Hoy:</p>
-                    <p className="text-xl font-black text-emerald-400">{nextRoutine._meta.dayName}</p>
-                </div>
-
-                {!restStatus.isReady ? (
-                  <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-5 text-center">
-                    <ShieldAlert className="mx-auto text-red-500 mb-2" size={32} />
-                    <h3 className="font-bold text-red-400 mb-1">Bloqueo de Recuperación</h3>
-                    <p className="text-sm text-gray-300 mb-3">El SNC necesita 48h para recuperarse.</p>
-                    <div className="text-xl font-black text-white">{restStatus.hoursLeft}h <span className="text-sm font-normal text-gray-400">restantes</span></div>
-                    <button onClick={onStart} className="mt-4 text-xs text-gray-500 underline">Forzar Inicio (No recomendado)</button>
-                  </div>
-                ) : (
-                  <button onClick={onStart} className="w-full bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-black uppercase tracking-widest py-4 rounded-2xl transition-all active:scale-95 shadow-[0_0_20px_rgba(16,185,129,0.3)] flex justify-center items-center gap-2">
-                    Comenzar <Play size={20} fill="currentColor" />
-                  </button>
-                )}
-              </div>
-
-              {/* SECCIÓN DE CONSEJOS CIENTÍFICOS */}
-              <div className="bg-gray-900 rounded-3xl p-6 border border-gray-800">
-                 <h3 className="font-bold text-white mb-4 flex items-center gap-2"><BookOpen size={18} className="text-emerald-500"/> Fundamentos del Progreso</h3>
-                 <div className="space-y-4 text-sm">
-                   <div>
-                     <p className="font-bold text-emerald-400 flex items-center gap-2"><Zap size={14}/> Sobrecarga Progresiva</p>
-                     <p className="text-gray-400 leading-relaxed mt-1">La app recordará tus repeticiones. Tu objetivo es superar ese número o pasar a una variación más difícil cuando superes el límite de reps.</p>
-                   </div>
-                   <div>
-                     <p className="font-bold text-emerald-400 flex items-center gap-2"><Flame size={14}/> Gestión del Fallo (RIR)</p>
-                     <p className="text-gray-400 leading-relaxed mt-1">No necesitas llegar al fallo muscular en cada serie. Detente cuando sientas que la siguiente repetición romperá tu técnica perfecta (RIR 1-2).</p>
-                   </div>
-                   <div>
-                     <p className="font-bold text-emerald-400 flex items-center gap-2"><Activity size={14}/> Nutrición y Recuperación</p>
-                     <p className="text-gray-400 leading-relaxed mt-1">Duerme 7-8 horas. Consume entre 1.6g y 2.0g de proteína por kilo de peso corporal para reconstruir tejido y tendones.</p>
-                   </div>
-                 </div>
-              </div>
-            </div>
-          );
-        }
-
-        const PHASES_ORDER = ['warmup', 'strength', 'core'];
-        const PHASE_NAMES = { warmup: 'Calentamiento', strength: 'Fuerza Principal', core: 'Core & Abdomen' };
-
-        function WorkoutEngine({ workoutData, onComplete, onAbort, history }) {
-          const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
-          const [activeExercise, setActiveExercise] = useState(null);
-          const [logs, setLogs] = useState({});
-          
-          const [isPhaseRest, setIsPhaseRest] = useState(false);
-          const [phaseRestTime, setPhaseRestTime] = useState(0);
-
-          const wakeLockRef = useRef(null);
-
-          useEffect(() => {
-            const requestWakeLock = async () => {
-              try {
-                if ('wakeLock' in navigator) wakeLockRef.current = await navigator.wakeLock.request('screen');
-              } catch (err) { console.log("Wake Lock falló:", err); }
-            };
-            requestWakeLock();
-            const handleVisibilityChange = () => { if (document.visibilityState === 'visible') requestWakeLock(); };
-            document.addEventListener('visibilitychange', handleVisibilityChange);
-            return () => {
-              document.removeEventListener('visibilitychange', handleVisibilityChange);
-              if (wakeLockRef.current) wakeLockRef.current.release();
-            };
-          }, []);
-
-          const sectionsAvailable = PHASES_ORDER.filter(s => workoutData.routine[s] && workoutData.routine[s].length > 0);
-          const currentSectionKey = sectionsAvailable[currentSectionIndex];
-          const exercises = workoutData.routine[currentSectionKey] || [];
-
-          useEffect(() => {
-            let timer;
-            if (isPhaseRest && phaseRestTime > 0) {
-              timer = setInterval(() => setPhaseRestTime(prev => prev - 1), 1000);
-            } else if (isPhaseRest && phaseRestTime === 0) {
-              playAlarm();
-              setIsPhaseRest(false);
-              setCurrentSectionIndex(prev => prev + 1);
-            }
-            return () => clearInterval(timer);
-          }, [isPhaseRest, phaseRestTime]);
-
-          const handleExerciseComplete = (exerciseId, exerciseLogs) => {
-            setLogs(prev => ({ ...prev, [exerciseId]: exerciseLogs }));
-            setActiveExercise(null);
-          };
-
-          const advanceSection = () => {
-            if (currentSectionIndex < sectionsAvailable.length - 1) {
-              setIsPhaseRest(true);
-              setPhaseRestTime(120); 
-            } else {
-              onComplete(logs);
-            }
-          };
-
-          if (activeExercise) {
-            const prevLogsForExercise = getPreviousExerciseLogs(history, activeExercise.id);
-            return <ExerciseLogger 
-                      exercise={activeExercise} 
-                      previousLogs={prevLogsForExercise}
-                      onSave={(exLogs) => handleExerciseComplete(activeExercise.id, exLogs)} 
-                      onCancel={() => setActiveExercise(null)} />;
-          }
-
-          if (isPhaseRest) {
-            const mins = Math.floor(phaseRestTime / 60);
-            const secs = phaseRestTime % 60;
-            const nextPhaseName = PHASE_NAMES[sectionsAvailable[currentSectionIndex + 1]];
-            return (
-              <div className="flex flex-col items-center justify-center h-[75vh] animate-fade-in text-center">
-                 <Clock size={64} className="text-emerald-500 mb-6 animate-pulse" />
-                 <h2 className="text-2xl font-black text-gray-400 uppercase tracking-widest mb-2">Cambio de Fase</h2>
-                 <div className="text-7xl font-black text-white tabular-nums tracking-tighter mb-8">
-                   {mins}:{secs < 10 ? '0':''}{secs}
-                 </div>
-                 <div className="bg-gray-800 p-5 rounded-2xl w-full max-w-sm border border-gray-700 shadow-lg mb-8 text-left">
-                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Siguiente en el programa:</h4>
-                    <p className="text-2xl font-black text-emerald-500 leading-tight mb-1">{nextPhaseName}</p>
-                    <p className="text-sm text-gray-400 mt-2">Respira y prepárate mentalmente.</p>
-                 </div>
-                 <button onClick={() => setPhaseRestTime(0)} className="px-6 py-3 rounded-xl bg-gray-800 text-gray-400 font-bold hover:bg-gray-700 transition-colors uppercase tracking-wider text-sm">Saltar descanso</button>
-              </div>
-            );
-          }
-
-          return (
-            <div className="animate-fade-in space-y-4">
-              <div className="flex justify-between items-center mb-6">
-                 <button onClick={onAbort} className="text-gray-400 hover:text-white"><X size={24}/></button>
-                 <div className="flex gap-1">
-                   {sectionsAvailable.map((s, idx) => (
-                     <div key={s} className={`h-1.5 w-8 rounded-full ${idx === currentSectionIndex ? 'bg-emerald-500' : idx < currentSectionIndex ? 'bg-emerald-500/30' : 'bg-gray-800'}`} />
-                   ))}
-                 </div>
-              </div>
-
-              <div className="mb-8">
-                <h2 className="text-3xl font-black text-white uppercase tracking-tight">{PHASE_NAMES[currentSectionKey]}</h2>
-                <p className="text-emerald-500 font-bold text-sm mt-1">{workoutData.routine._meta.dayName}</p>
-              </div>
-
-              <div className="space-y-3">
-                {exercises.map((ex, idx) => {
-                  const isCompleted = !!logs[ex.id];
-                  return (
-                    <button key={ex.id} onClick={() => setActiveExercise(ex)} className={`w-full text-left p-4 rounded-2xl border transition-all flex justify-between items-center group ${isCompleted ? 'bg-gray-900 border-gray-800 opacity-60' : 'bg-gray-800 border-gray-700 hover:border-emerald-500'}`}>
-                      <div>
-                         <h4 className={`font-bold ${isCompleted ? 'text-gray-500 line-through' : 'text-white'}`}>{idx + 1}. {ex.name}</h4>
-                         {(ex.sets || ex.maxSets) && (
-                           <p className="text-sm text-emerald-500/80 font-medium mt-1">
-                             {ex.minSets ? `${ex.minSets}-${ex.maxSets}` : ex.sets} Sets x {ex.minReps && ex.maxReps ? `${ex.minReps}-${ex.maxReps}` : ex.reps || ex.duration} {ex.unit || ''}
-                           </p>
-                         )}
-                      </div>
-                      {isCompleted ? <CheckCircle className="text-emerald-500" size={24}/> : <ChevronRight className="text-gray-500 group-hover:text-emerald-500 transition-colors" size={24}/>}
-                    </button>
-                  )
-                })}
-              </div>
-
-              <div className="mt-8 flex gap-3">
-                  <button onClick={advanceSection} className="flex-1 bg-white text-gray-950 font-black uppercase py-4 rounded-2xl hover:bg-gray-200 transition-colors">
-                    {currentSectionIndex < sectionsAvailable.length - 1 ? 'Siguiente Fase' : 'Finalizar Entrenamiento'}
-                  </button>
-                  {currentSectionIndex < sectionsAvailable.length - 1 && (
-                     <button onClick={advanceSection} className="px-4 bg-gray-800 text-gray-400 font-bold uppercase rounded-2xl border border-gray-700 hover:text-white hover:border-gray-500 transition-colors text-xs text-center flex items-center">
-                        Saltar<br/>Fase
-                     </button>
-                  )}
-              </div>
-            </div>
-          );
-        }
-
-        function ExerciseLogger({ exercise, previousLogs, onSave, onCancel }) {
-          const [currentSet, setCurrentSet] = useState(1);
-          const [setLogs, setSetLogs] = useState([]);
-          const [repInput, setRepInput] = useState('');
-          const [techFailure, setTechFailure] = useState(false);
-          const [isResting, setIsResting] = useState(false);
-          const [timeLeft, setTimeLeft] = useState(0);
-          
-          const [stopwatchTime, setStopwatchTime] = useState(0);
-          const [isStopwatchRunning, setIsStopwatchRunning] = useState(false);
-
-          const isTimed = exercise.unit === 's' || exercise.duration;
-          const totalSets = exercise.maxSets || exercise.sets || 1;
-
-          // Recuperar datos de la sesión anterior para este set
-          const prevLogForCurrentSet = previousLogs ? previousLogs.find(l => l.set === currentSet) : null;
-          const previousValue = prevLogForCurrentSet ? prevLogForCurrentSet.value : null;
-
-          // Verificación en vivo de superación de récord
-          const currentInputVal = parseInt(repInput);
-          const isBeaten = !isNaN(currentInputVal) && previousValue && currentInputVal > previousValue;
-          const isTied = !isNaN(currentInputVal) && previousValue && currentInputVal === previousValue;
-
-          let minTargetSeconds = 0;
-          let maxTargetSeconds = 0;
-
-          if (exercise.unit === 's') {
-            if (exercise.minReps) minTargetSeconds = exercise.minReps;
-            if (exercise.maxReps) maxTargetSeconds = exercise.maxReps;
-          } else if (exercise.duration) {
-            const match = exercise.duration.match(/(\d+)\s*min/);
-            if (match) minTargetSeconds = parseInt(match[1]) * 60;
-            else minTargetSeconds = parseInt(exercise.duration) || 0;
-          }
-
-          useEffect(() => {
-            let timer;
-            if (isResting && timeLeft > 0) {
-              timer = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
-            } else if (isResting && timeLeft === 0) {
-              playAlarm(); 
-              setIsResting(false);
-              if (currentSet < totalSets) {
-                 setCurrentSet(prev => prev + 1);
-                 setRepInput('');
-                 setTechFailure(false);
-                 setStopwatchTime(0);
-              } else {
-                 onSave(setLogs); 
-              }
-            }
-            return () => clearInterval(timer);
-          }, [isResting, timeLeft, currentSet, totalSets]);
-
-          useEffect(() => {
-            let interval;
-            if (isStopwatchRunning) {
-              interval = setInterval(() => {
-                setStopwatchTime(prev => {
-                  const nextTime = prev + 1;
-                  if ((minTargetSeconds > 0 && nextTime === minTargetSeconds) || 
-                      (maxTargetSeconds > 0 && nextTime === maxTargetSeconds && maxTargetSeconds !== minTargetSeconds)) {
-                    playAlarm(); 
-                  }
-                  return nextTime;
-                });
-              }, 1000);
-            }
-            return () => clearInterval(interval);
-          }, [isStopwatchRunning, minTargetSeconds, maxTargetSeconds]);
-
-          const handleStopwatchToggle = () => {
-            if (isStopwatchRunning) {
-               setIsStopwatchRunning(false);
-               setRepInput(stopwatchTime.toString());
-            } else {
-               setIsStopwatchRunning(true);
-            }
-          };
-
-          const handleLogSet = () => {
-            const val = parseInt(repInput);
-            if (isNaN(val) && !exercise.duration) return;
-
-            const newLog = {
-              set: currentSet,
-              value: val || exercise.duration,
-              techFailure
-            };
-
-            const newLogs = [...setLogs, newLog];
-            setSetLogs(newLogs);
-            
-            const canFinishEarly = exercise.minSets && currentSet >= exercise.minSets;
-
-            if (currentSet < totalSets && !canFinishEarly) {
-               setIsResting(true);
-               setTimeLeft(exercise.rest || 60);
-            } else if (currentSet < totalSets && canFinishEarly) {
-               setIsResting(true);
-               setTimeLeft(exercise.rest || 60);
-            } else {
-               onSave(newLogs);
-            }
-          };
-
-          if (isResting) {
-            const mins = Math.floor(timeLeft / 60);
-            const secs = timeLeft % 60;
-            const reachedMinSets = exercise.minSets && currentSet >= exercise.minSets;
-
-            // Info de lo que toca superar en el SIGUIENTE set
-            const prevLogForNextSet = previousLogs ? previousLogs.find(l => l.set === currentSet + 1) : null;
-
-            return (
-              <div className="flex flex-col items-center justify-center h-[75vh] animate-fade-in text-center">
-                 <Clock size={64} className="text-emerald-500 mb-6 animate-pulse" />
-                 <h2 className="text-2xl font-black text-gray-400 uppercase tracking-widest mb-2">Recuperación</h2>
-                 <div className="text-7xl font-black text-white tabular-nums tracking-tighter mb-8">
-                   {mins}:{secs < 10 ? '0':''}{secs}
-                 </div>
-                 
-                 <div className="bg-gray-800 p-5 rounded-2xl w-full max-w-sm border border-gray-700 shadow-lg mb-8 text-left relative overflow-hidden">
-                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Preparando Siguiente</h4>
-                    <p className="text-xl font-black text-white leading-tight mb-1">{exercise.name}</p>
-                    <p className="text-emerald-500 font-bold mb-3 text-sm">Set {currentSet + 1} de {totalSets}</p>
-                    
-                    {prevLogForNextSet && (
-                        <div className="mt-3 pt-3 border-t border-gray-700">
-                           <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Récord a superar este set:</p>
-                           <p className="text-lg font-black text-white">{prevLogForNextSet.value} {exercise.unit || 'reps'}</p>
+                    <div class="flex-1 flex items-center justify-center relative">
+                        <!-- Círculo SVG -->
+                        <svg class="absolute w-64 h-64 timer-circle" viewBox="0 0 100 100">
+                            <circle cx="50" cy="50" r="45" fill="none" stroke="#1e293b" stroke-width="8"></circle>
+                            <circle id="timer-path" cx="50" cy="50" r="45" fill="none" stroke="#3b82f6" stroke-width="8" stroke-dasharray="283" stroke-dashoffset="0" stroke-linecap="round"></circle>
+                        </svg>
+                        <div class="text-center z-10">
+                            <span id="timer-display" class="text-6xl font-black font-mono"></span>
+                            <p class="text-slate-400 text-sm mt-1">segundos</p>
                         </div>
-                    )}
-                 </div>
+                    </div>
 
-                 <div className="flex flex-col gap-3 w-full max-w-sm">
-                     <button onClick={() => setTimeLeft(0)} className="w-full py-3 rounded-xl bg-gray-800 text-gray-400 text-sm font-bold hover:bg-gray-700 transition-colors uppercase tracking-widest">Saltar descanso</button>
-                     {reachedMinSets && (
-                         <button onClick={() => onSave(setLogs)} className="w-full py-3 rounded-xl border border-emerald-500/50 text-emerald-400 text-sm font-bold hover:bg-emerald-500/10 transition-colors uppercase tracking-widest">Ya cumplí el mínimo, finalizar</button>
-                     )}
-                 </div>
-              </div>
-            );
-          }
+                    <div class="flex gap-4">
+                        <button onclick="addTime(-30)" class="flex-1 py-3 bg-slate-800 rounded-xl font-bold active:bg-slate-700">-30s</button>
+                        <button onclick="addTime(30)" class="flex-1 py-3 bg-slate-800 rounded-xl font-bold active:bg-slate-700">+30s</button>
+                    </div>
 
-          return (
-            <div className="animate-fade-in flex flex-col h-full">
-              <div className="flex justify-between items-center mb-6">
-                 <button onClick={onCancel} className="text-gray-400 hover:text-white"><ChevronRight className="rotate-180"/></button>
-                 <span className="font-bold text-gray-400">Set {currentSet} / {totalSets} {exercise.minSets ? `(Mín. ${exercise.minSets})` : ''}</span>
-              </div>
-
-              <h2 className="text-3xl font-black text-white uppercase tracking-tight leading-none mb-2">{exercise.name}</h2>
-              
-              {exercise.cue && (
-                <div className="bg-emerald-500/10 border-l-2 border-emerald-500 p-3 mb-6">
-                   <p className="text-sm text-emerald-400 font-medium">🎯 Foco: {exercise.cue}</p>
+                    <button onclick="skipTimer()" class="w-full mt-6 bg-slate-700 active:bg-slate-600 py-4 rounded-2xl font-bold text-lg transition">
+                        OMITIR DESCANSO <i class="fa-solid fa-forward-step ml-2"></i>
+                    </button>
                 </div>
-              )}
+            `;
 
-              <div className="space-y-6 flex-1">
+            const display = document.getElementById('timer-display');
+            const path = document.getElementById('timer-path');
+            const circumference = 283; // 2 * pi * 45
+
+            function updateUI() {
+                let m = Math.floor(timeLeft / 60);
+                let s = timeLeft % 60;
+                display.innerText = `${m > 0 ? m+':' : ''}${s < 10 && m > 0 ? '0' : ''}${s}`;
                 
-                {/* TARJETA DE MEMORIA: SESIÓN ANTERIOR */}
-                {previousValue && (
-                  <div className={`p-4 rounded-xl border flex justify-between items-center transition-colors ${isBeaten ? 'bg-emerald-500/10 border-emerald-500/50' : isTied ? 'bg-yellow-500/10 border-yellow-500/50' : 'bg-gray-800 border-gray-700'}`}>
-                     <div>
-                        <span className="text-xs text-gray-400 block uppercase font-bold tracking-wider mb-1">Sesión Anterior (Este Set)</span>
-                        <span className="text-xl font-black text-white">{previousValue} {exercise.unit || 'reps'}</span>
-                     </div>
-                     {isBeaten && <span className="text-emerald-500 font-bold text-sm flex items-center gap-1 animate-pulse"><CheckCircle size={18}/> ¡Superado!</span>}
-                     {isTied && <span className="text-yellow-500 font-bold text-sm">Igualado</span>}
-                     {!isBeaten && !isTied && currentInputVal > 0 && <span className="text-gray-500 font-bold text-sm text-right leading-tight">Faltan<br/>{previousValue - currentInputVal}</span>}
-                  </div>
-                )}
+                const offset = circumference - (timeLeft / totalTime) * circumference;
+                path.style.strokeDashoffset = offset;
+            }
 
-                {isTimed && (
-                  <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 text-center shadow-inner">
-                    <div className="flex items-center justify-center gap-2 mb-2 text-gray-400">
-                      <Timer size={18} /> <span className="text-sm font-bold uppercase tracking-wider">Cronómetro Activo</span>
-                    </div>
-                    <div className="text-6xl font-black text-white tabular-nums mb-6 tracking-tighter">
-                      {Math.floor(stopwatchTime / 60)}:{(stopwatchTime % 60).toString().padStart(2, '0')}
-                    </div>
-                    <div className="flex justify-center gap-3">
-                       <button onClick={handleStopwatchToggle} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-black uppercase tracking-wide transition-all ${isStopwatchRunning ? 'bg-red-500/20 text-red-500 border border-red-500/50' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 hover:bg-emerald-500/30'}`}>
-                         {isStopwatchRunning ? <><Pause size={18}/> Pausar</> : <><Play size={18}/> Iniciar</>}
-                       </button>
-                       <button onClick={() => { setStopwatchTime(0); setIsStopwatchRunning(false); setRepInput(''); }} className="px-5 py-3 rounded-xl font-bold uppercase tracking-wide bg-gray-800 text-gray-400 border border-gray-700 hover:bg-gray-700 transition-colors">
-                         Reset
-                       </button>
-                    </div>
-                  </div>
-                )}
+            updateUI();
 
-                {(!exercise.duration || isTimed) && (
-                  <div>
-                    <label className="block text-sm font-bold text-gray-400 mb-2 uppercase tracking-wide">
-                      {isTimed ? 'Segundos completados' : 'Repeticiones'} {exercise.minReps && exercise.maxReps ? `(Meta: ${exercise.minReps}-${exercise.maxReps})` : ''}
-                    </label>
-                    <input type="number" value={repInput} onChange={e => setRepInput(e.target.value)} className="w-full bg-gray-900 border-2 border-gray-700 rounded-2xl p-4 text-center text-4xl font-black text-white focus:border-emerald-500 focus:outline-none transition-colors" placeholder="0" />
-                  </div>
-                )}
-              </div>
+            window.addTime = (t) => {
+                timeLeft += t;
+                totalTime += t;
+                if(timeLeft < 5) timeLeft = 5;
+                updateUI();
+            };
 
-              <button onClick={handleLogSet} disabled={!repInput && !exercise.duration} className="mt-8 w-full bg-emerald-500 disabled:bg-gray-800 disabled:text-gray-500 text-gray-950 font-black uppercase tracking-widest py-4 rounded-2xl transition-all">
-                Registrar Set
-              </button>
-            </div>
-          );
+            window.skipTimer = () => {
+                clearInterval(timerInterval);
+                playBeep(); // Feedback
+                renderExercise();
+            };
+
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                updateUI();
+                
+                // Beeps preparatorios
+                if (timeLeft === 3 || timeLeft === 2 || timeLeft === 1) {
+                    playBeep();
+                }
+
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    playLongBeep();
+                    triggerVibration([200, 100, 200, 100, 400]); // Patrón de vibración fin de descanso
+                    renderExercise();
+                }
+            }, 1000);
         }
 
-        function SettingsView({ onExport, onImport, history, onReset }) {
-          const fileInputRef = useRef(null);
-
-          return (
-            <div className="space-y-6 animate-fade-in">
-              <h2 className="text-2xl font-black text-white uppercase tracking-tight mb-6">Ajustes y Datos</h2>
-              
-              <div className="bg-gray-900 rounded-2xl p-6 border border-gray-800">
-                <h3 className="font-bold text-white mb-2">Resguardo de Progreso</h3>
-                <p className="text-sm text-gray-400 mb-6">La app guarda localmente. Exporta tu progreso periódicamente.</p>
-                
-                <div className="space-y-3">
-                  <button onClick={onExport} className="w-full bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors">
-                    <Download size={18} /> Descargar Copia (JSON)
-                  </button>
-                  <button onClick={() => fileInputRef.current.click()} className="w-full border border-gray-700 hover:bg-gray-800 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors">
-                    <Upload size={18} /> Restaurar Progreso
-                  </button>
-                  <input type="file" accept=".json" className="hidden" ref={fileInputRef} onChange={onImport} />
+        function renderFinished() {
+            releaseWakeLock();
+            appContent.innerHTML = `
+                <div class="fade-in h-full flex flex-col items-center justify-center text-center">
+                    <div class="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center mb-6 shadow-lg shadow-green-500/50">
+                        <i class="fa-solid fa-trophy text-4xl text-white"></i>
+                    </div>
+                    <h2 class="text-3xl font-black mb-2">¡Completado!</h2>
+                    <p class="text-slate-400 mb-8 max-w-xs">Has terminado el módulo de hoy. Recuerda que la consistencia es la clave de la calistenia.</p>
+                    
+                    <button onclick="renderHome()" class="w-full max-w-xs bg-blue-600 py-4 rounded-xl font-bold shadow-lg shadow-blue-500/30">
+                        Volver al Inicio
+                    </button>
                 </div>
-              </div>
-
-              <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-6">
-                <h3 className="font-bold text-red-400 mb-2 flex items-center gap-2"><Trash2 size={18}/> Zona de Peligro</h3>
-                <p className="text-sm text-gray-400 mb-4">Borrar todo tu historial y volver al primer día.</p>
-                <button onClick={onReset} className="w-full bg-red-500/20 hover:bg-red-500/40 text-red-400 border border-red-500/50 font-bold py-3 px-4 rounded-xl transition-colors">
-                  Reiniciar Progreso
-                </button>
-              </div>
-
-              <div className="bg-gray-900 rounded-2xl p-6 border border-gray-800">
-                 <h3 className="font-bold text-white mb-4">Historial Reciente</h3>
-                 {history.length === 0 ? (
-                   <p className="text-sm text-gray-500">Aún no hay entrenamientos registrados.</p>
-                 ) : (
-                   <div className="space-y-3">
-                     {[...history].reverse().slice(0, 5).map((h, i) => (
-                       <div key={i} className="flex justify-between items-center border-b border-gray-800 pb-2">
-                         <div>
-                           <span className="block text-sm font-bold text-white">Semana {h.week}</span>
-                           <span className="block text-xs text-gray-500">{new Date(h.date).toLocaleDateString()}</span>
-                         </div>
-                         <CheckCircle className="text-emerald-500" size={16}/>
-                       </div>
-                     ))}
-                   </div>
-                 )}
-              </div>
-            </div>
-          );
+            `;
         }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        // --- 5. LÓGICA DE INTERFAZ GENERAL ---
+        document.getElementById('btn-rules').addEventListener('click', () => {
+            const modal = document.getElementById('modal-rules');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.remove('opacity-0'), 10);
+        });
+
+        document.getElementById('btn-close-rules').addEventListener('click', () => {
+            const modal = document.getElementById('modal-rules');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        });
+
+        // Inicializar
+        renderHome();
     </script>
 </body>
 </html>
