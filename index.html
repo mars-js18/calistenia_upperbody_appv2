@@ -48,9 +48,14 @@
             <i class="fa-solid fa-dumbbell text-blue-500 text-xl"></i>
             <h1 class="font-bold text-lg tracking-wide">Cali<span class="text-blue-500">Pro</span></h1>
         </div>
-        <button id="btn-rules" class="text-slate-300 hover:text-white transition">
-            <i class="fa-solid fa-shield-halved"></i> Reglas
-        </button>
+        <div class="flex gap-3 items-center">
+            <button id="btn-install" class="hidden bg-green-600/20 text-green-400 px-3 py-1 rounded-full text-sm font-bold border border-green-500/30">
+                <i class="fa-solid fa-download"></i> Instalar
+            </button>
+            <button id="btn-rules" class="text-slate-300 hover:text-white transition">
+                <i class="fa-solid fa-shield-halved"></i> Reglas
+            </button>
+        </div>
     </header>
 
     <!-- CONTENEDOR PRINCIPAL -->
@@ -73,28 +78,56 @@
 
     <!-- LOGICA DE LA APP (Todo en JS) -->
     <script>
+        // --- 0. PWA DYNAMIC SETUP (Instalación Android/iOS) ---
+        const manifest = {
+            "name": "Calistenia Pro",
+            "short_name": "CaliPro",
+            "start_url": ".",
+            "display": "standalone",
+            "background_color": "#0f172a",
+            "theme_color": "#0f172a",
+            "icons": [{"src": "https://cdn-icons-png.flaticon.com/512/2964/2964514.png", "sizes": "512x512", "type": "image/png"}]
+        };
+        const manifestUrl = URL.createObjectURL(new Blob([JSON.stringify(manifest)], {type: 'application/json'}));
+        document.head.insertAdjacentHTML('beforeend', `<link rel="manifest" href="${manifestUrl}">`);
+
+        const swCode = "self.addEventListener('install', e => self.skipWaiting()); self.addEventListener('activate', e => self.clients.claim()); self.addEventListener('fetch', e => {});";
+        try {
+            const swUrl = URL.createObjectURL(new Blob([swCode], {type: 'application/javascript'}));
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register(swUrl).catch(err => {
+                    console.warn('El registro del ServiceWorker falló (protocolo blob no soportado en esta vista), pero la app funcionará normal:', err);
+                });
+            }
+        } catch (e) {
+            console.warn('Error al configurar Service Worker dinámico:', e);
+        }
+
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            const btn = document.getElementById('btn-install');
+            if(btn) btn.classList.remove('hidden');
+        });
+
         // --- 1. BASE DE DATOS DE LA RUTINA ---
         const routineData = {
-            warmup: {
-                id: 'warmup', title: "Módulo de Calentamiento", time: "5-10 min",
-                desc: "Obligatorio previo a cada sesión.", icon: "fa-fire", color: "text-orange-500", bg: "bg-orange-500",
-                exercises: [
-                    { id: "w1", name: "Movilidad Articular", technique: "Círculos lentos y amplios de cuello, hombros, codos y muñecas.", repsLabel: "1 min por articulación", sets: 1, rest: 0 },
-                    { id: "w2", name: "Activación Escapular", technique: "Colgado con brazos estirados. Sube y baja usando solo omóplatos. Brazos bloqueados.", repsLabel: "10 repeticiones", sets: 2, rest: 45 },
-                    { id: "w3", name: "Plancha Frontal (Anillas/Puños)", technique: "Posición alta de lagartija empujando fuerte hacia abajo (protracción).", repsLabel: "30 segundos", sets: 1, rest: 0 }
-                ]
-            },
             day1: {
                 id: 'day1', title: "Día 1: Fuerza y Potencia", time: "Fibras rápidas",
                 desc: "Calidad sobre cantidad. Detén la serie si pierdes técnica.", icon: "fa-bolt", color: "text-yellow-400", bg: "bg-yellow-500",
                 exercises: [
                     { id: "d1e1", name: "Dominadas Explosivas", technique: "Agarre prono al ancho de hombros. Tracciona explosivo buscando que la barra golpee bajo el pecho. Bajada rápida pero controlada.", 
+                      tips: "Desde posición colgado total (Dead hang). Busca máxima explosividad traccionando hacia tu esternón.", mistakes: "Usar balanceo (kipping) con las piernas o no soltar los codos por completo en la bajada.",
                       progression: ["5x3", "5x4", "5x5"], rest: 180, setsProgression: true },
                     { id: "d1e2", name: "Pike Push-ups", technique: "Cuerpo en 'V' invertida. Codos atrás a 45°. Cabeza toca delante de las manos (triángulo). En anillas: a 20-30cm del suelo.", 
+                      tips: "Mantén las caderas bien altas y piernas rectas. Forma un triángulo entre manos y cabeza en el fondo.", mistakes: "Abrir los codos hacia los lados (riesgo de lesión de hombro) o bajar la cabeza justo entre las manos.",
                       progression: ["4x8", "4x9", "4x10", "4x11", "4x12", "4x12 (Pies en cajón)"], rest: 120, setsProgression: true },
                     { id: "d1e3", name: "Elevaciones L-Sit / Rodillas", technique: "Colgado. Enrollar pelvis. Elevar piernas rectas (L-Sit) o rodillas al pecho.", 
+                      tips: "Aplica retroversión pélvica (hunde el ombligo) para conectar realmente el core antes de subir.", mistakes: "Arquear la zona lumbar hacia afuera o dejar caer las piernas por simple inercia.",
                       progression: ["4 series de 15s", "4 series de 20s", "4 series de 25s", "4 series de 30s"], rest: 90, setsProgression: true },
                     { id: "d1e4", name: "Dominadas Negativas", technique: "Saltar a posición alta. Bajar lo más lento posible manteniendo tensión. No caerse al final.", 
+                      tips: "Toda la bajada debe realizarse a una velocidad constante y bajo tu control total.", mistakes: "Dejarse caer bruscamente en los últimos centímetros del movimiento perdiendo la contracción.",
                       progression: ["3x5 (Bajada 5s)", "3x5 (Bajada 6s)", "3x5 (Bajada 8s)", "3x5 (Bajada 10s)"], rest: 120, setsProgression: true }
                 ]
             },
@@ -103,12 +136,16 @@
                 desc: "100 repeticiones. Resistencia profunda.", icon: "fa-heart-pulse", color: "text-red-500", bg: "bg-red-500",
                 exercises: [
                     { id: "d2e1", name: "Escalera Dominadas", technique: "Rotar agarre cada 2 series: 1. Prona, 2. Supina, 3. Comando (mixto), 4. Ancha, 5. Anillas (rotación natural).", 
+                      tips: "Rotar los agarres es la clave para evitar tendinitis y estimular todos los ángulos de tu dorsal.", mistakes: "No respetar el tiempo de descanso estricto (90s) o acortar el rango al sentir fatiga.",
                       progression: ["10 series x 3 reps", "10x4 reps", "10x5 reps", "10x6 reps", "10x7 reps", "10x8 reps", "10x10 reps"], rest: 90, setsProgression: true },
                     { id: "d2e2", name: "Escalera Lagartijas", technique: "Rotar cada 2-3 series. Codos a 45°. Variaciones: Neutras, Diamante, Arqueras, Profundas (Anillas).", 
+                      tips: "Mantén el cuerpo recto como una tabla apretando glúteos. Codos apuntando a 45 grados.", mistakes: "Empujar con la palma abierta y extendida en el piso (Regla de Oro). Hundir la cadera al bajar.",
                       progression: ["10 series x 3 reps", "10x4 reps", "10x5 reps", "10x6 reps", "10x7 reps", "10x8 reps", "10x10 reps"], rest: 90, setsProgression: true },
                     { id: "d2e3", name: "Abdominales 4-Way", technique: "Colgado. 1 serie es el circuito: 1. A la Izq, 2. A la Der, 3. Cruzados, 4. Centro.", 
+                      tips: "Ejecuta un movimiento muscular puro de flexión de cadera y abdomen, bloqueando hombros.", mistakes: "Usar el impulso para balancearte de lado a lado.",
                       progression: ["3 Series (Rodillas)", "3 Series (Piernas Rectas)"], rest: 60, setsProgression: true },
                     { id: "d2e4", name: "Extensiones Superman", technique: "Boca abajo. Apretar glúteos, elevar pecho, brazos y muslos. Mirada al suelo.", 
+                      tips: "Mantén la mirada al suelo para alinear el cuello. La fuerza debe nacer de lumbares y glúteos.", mistakes: "Mirar forzosamente hacia el techo (hiperextensión de cervicales) o doblar las rodillas.",
                       progression: ["3 series de 20s estático", "3x25s", "3x30s", "3x40s", "3x45s"], rest: 60, setsProgression: true }
                 ]
             },
@@ -117,14 +154,19 @@
                 desc: "Desarrollo estabilizador y corrección de asimetrías.", icon: "fa-rings-wedding", color: "text-purple-400", bg: "bg-purple-500",
                 exercises: [
                     { id: "d3e1", name: "Soporte Isométrico Anillas", technique: "Sostenerse con codos bloqueados. Empujar hacia abajo (depresión escapular).", 
+                      tips: "Bloquea al 100% tus codos y haz fuerza hacia el piso para alejar tus hombros de tus orejas.", mistakes: "Mantener una leve flexión en el codo o encogerse de hombros.",
                       progression: ["3 series de 20s", "3x25s", "3x30s", "3x35s", "3x40s", "3x45s", "3x45s (Palmas Afuera - RTO)"], rest: 90, setsProgression: true },
                     { id: "d3e2", name: "Remos en Anillas", technique: "Cuerpo recto. Traccionar hasta tocar costillas. Retracción máxima arriba.", 
+                      tips: "Tracciona hasta que sientas que juntas ambos omóplatos fuertemente en tu espalda media.", mistakes: "Jalar únicamente doblando los brazos sin activar las escápulas ni el dorsal.",
                       progression: ["4x8 reps", "4x9 reps", "4x10 reps", "4x11 reps", "4x12 reps", "4x12 (Cuerpo más horizontal)"], rest: 90, setsProgression: true },
                     { id: "d3e3", name: "Lagartijas Anillas al Fallo", technique: "Agarre neutro. Bajar lidando con vibración. Fallo técnico (detener si se pierde postura).", 
+                      tips: "Baja controlando conscientemente la vibración. Exige mucha estabilización del manguito rotador.", mistakes: "Continuar repeticiones a pesar de que la cadera se hunda o las anillas tiemblen descontroladamente.",
                       progression: ["4 series x Fallo Técnico"], rest: 120, setsProgression: true },
                     { id: "d3e4", name: "Combo: Escápulas + Cuelgue", technique: "Fase 1: 10 encogimientos escapulares. Fase 2: Quedarse colgado (Dead Hang) relajado hasta que falle el agarre.", 
+                      tips: "Los brazos son simples ganchos, sube y baja usando solo tus escápulas (omóplatos).", mistakes: "Usar fuerza de los bíceps para encogerse, o soltarse antes del fallo muscular total en los antebrazos.",
                       progression: ["3 Series de Combo completo"], rest: 60, setsProgression: true },
                     { id: "d3e5", name: "Superman Dinámico", technique: "Subir explosivo, mantener contracción 1s arriba, bajar controlado.", 
+                      tips: "La subida es rápida, pero el segundo en la parte alta te garantiza el trabajo real en los erectores.", mistakes: "Rebotar subiendo y bajando rápidamente ignorando el tiempo bajo tensión.",
                       progression: ["3 series x 15 reps"], rest: 60, setsProgression: true }
                 ]
             }
@@ -168,7 +210,36 @@
         }
 
         function playBeep() { playTone(880, 'sine', 0.2); }
-        function playLongBeep() { playTone(660, 'square', 0.8); }
+        
+        function playNotification() {
+            try {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                
+                // Tono 1 (Alto y claro)
+                const osc1 = audioCtx.createOscillator();
+                const gain1 = audioCtx.createGain();
+                osc1.type = 'sine';
+                osc1.frequency.setValueAtTime(987.77, audioCtx.currentTime); // Nota Si
+                gain1.gain.setValueAtTime(0.8, audioCtx.currentTime); // Volumen al 80%
+                gain1.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+                osc1.connect(gain1);
+                gain1.connect(audioCtx.destination);
+                osc1.start();
+                osc1.stop(audioCtx.currentTime + 0.3);
+
+                // Tono 2 (Campana Final)
+                const osc2 = audioCtx.createOscillator();
+                const gain2 = audioCtx.createGain();
+                osc2.type = 'sine';
+                osc2.frequency.setValueAtTime(1318.51, audioCtx.currentTime + 0.15); // Nota Mi
+                gain2.gain.setValueAtTime(0.8, audioCtx.currentTime + 0.15); // Volumen al 80%
+                gain2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.6);
+                osc2.connect(gain2);
+                gain2.connect(audioCtx.destination);
+                osc2.start(audioCtx.currentTime + 0.15);
+                osc2.stop(audioCtx.currentTime + 0.6);
+            } catch (e) { console.log("Audio no soportado"); }
+        }
         
         function triggerVibration(pattern) {
             if ("vibrate" in navigator) navigator.vibrate(pattern);
@@ -212,7 +283,12 @@
                 `;
             });
 
-            html += `</div>`;
+            html += `
+                </div>
+                <button onclick="renderLibrary()" class="w-full mt-8 bg-slate-800 border border-slate-700 hover:bg-slate-700 py-4 rounded-xl font-bold text-blue-400 transition flex items-center justify-center gap-2 shadow-lg">
+                    <i class="fa-solid fa-book-open"></i> Biblioteca de Ejercicios y Detalles
+                </button>
+            `;
             appContent.innerHTML = html;
         }
 
@@ -284,7 +360,7 @@
             }
 
             appContent.innerHTML = `
-                <div class="fade-in h-full flex flex-col">
+                <div class="fade-in min-h-full flex flex-col pb-6">
                     <div class="flex justify-between items-center mb-4">
                         <button onclick="quitWorkout()" class="text-slate-400 p-2"><i class="fa-solid fa-xmark text-xl"></i></button>
                         <span class="text-xs font-bold uppercase tracking-widest text-slate-500">${activeWorkout.title}</span>
@@ -292,12 +368,12 @@
                     </div>
 
                     <div class="flex-1 flex flex-col justify-center">
-                        <div class="text-center mb-6">
+                        <div class="text-center mb-6 mt-2">
                             <span class="inline-block px-3 py-1 bg-blue-500/20 text-blue-400 text-xs font-bold rounded-full mb-3">Ejercicio ${currentExIndex + 1} de ${activeWorkout.exercises.length}</span>
                             <h2 class="text-3xl font-black leading-tight">${ex.name}</h2>
                         </div>
 
-                        <div class="glass-panel p-5 rounded-2xl mb-6">
+                        <div class="glass-panel p-5 rounded-2xl mb-4">
                             <div class="flex justify-between border-b border-slate-700 pb-3 mb-3">
                                 <div>
                                     <p class="text-xs text-slate-400">Objetivo</p>
@@ -312,13 +388,30 @@
                             ${levelControls}
                         </div>
 
+                        <!-- NUEVA SECCIÓN: DETALLES DE EJECUCIÓN -->
+                        <div class="glass-panel p-5 rounded-2xl mb-6 border border-blue-500/20">
+                            <h3 class="text-sm font-bold text-blue-400 mb-3 border-b border-blue-500/30 pb-2 flex items-center gap-2">
+                                <i class="fa-solid fa-graduation-cap"></i> Detalles de Ejecución
+                            </h3>
+                            <div class="space-y-4 text-sm">
+                                <p class="text-slate-200 leading-snug">
+                                    <strong class="text-green-400 block mb-1"><i class="fa-solid fa-check"></i> Consejo Clave:</strong>
+                                    ${ex.tips}
+                                </p>
+                                <p class="text-slate-200 leading-snug">
+                                    <strong class="text-red-400 block mb-1"><i class="fa-solid fa-xmark"></i> Errores Comunes:</strong>
+                                    ${ex.mistakes}
+                                </p>
+                            </div>
+                        </div>
+
                         <div class="glass-panel p-4 rounded-xl border-l-4 border-l-yellow-500 mb-6">
                             <p class="text-xs text-slate-400">Siguiente</p>
                             <p class="font-semibold text-sm truncate">${nextText}</p>
                         </div>
                     </div>
 
-                    <button onclick="finishSet()" class="w-full bg-blue-600 active:bg-blue-700 transition py-4 rounded-2xl font-black text-lg shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2">
+                    <button onclick="finishSet()" class="w-full mt-auto bg-blue-600 active:bg-blue-700 transition py-4 rounded-2xl font-black text-lg shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2">
                         <i class="fa-solid fa-check"></i> COMPLETAR SERIE
                     </button>
                 </div>
@@ -372,32 +465,54 @@
                 timeLeft = 180; totalTime = 180;
             }
 
+            // INFO DEL PRÓXIMO EJERCICIO PARA MOSTRAR EN EL TIMER
+            const nextEx = activeWorkout.exercises[currentExIndex];
+            const nextInfo = getSetsAndRepsInfo(nextEx);
+
             appContent.innerHTML = `
                 <div class="fade-in h-full flex flex-col justify-between">
-                    <div class="text-center pt-8">
-                        <p class="text-slate-400 text-sm font-bold uppercase tracking-widest mb-2">${isBlockChange ? 'DESCANSO ENTRE BLOQUES' : 'DESCANSO'}</p>
-                        <p class="text-xs text-yellow-400 px-6">${isBlockChange ? '<i class="fa-solid fa-triangle-exclamation"></i> Limpia el ácido láctico antes de cambiar de ejercicio.' : ''}</p>
+                    <div class="text-center pt-2">
+                        <p class="text-slate-400 text-sm font-bold uppercase tracking-widest mb-1">${isBlockChange ? 'DESCANSO ENTRE BLOQUES' : 'DESCANSO'}</p>
+                        ${isBlockChange ? '<p class="text-xs text-yellow-400 px-4"><i class="fa-solid fa-triangle-exclamation"></i> Limpia el ácido láctico antes de iniciar el nuevo ejercicio.</p>' : ''}
                     </div>
 
-                    <div class="flex-1 flex items-center justify-center relative">
-                        <!-- Círculo SVG -->
-                        <svg class="absolute w-64 h-64 timer-circle" viewBox="0 0 100 100">
-                            <circle cx="50" cy="50" r="45" fill="none" stroke="#1e293b" stroke-width="8"></circle>
-                            <circle id="timer-path" cx="50" cy="50" r="45" fill="none" stroke="#3b82f6" stroke-width="8" stroke-dasharray="283" stroke-dashoffset="0" stroke-linecap="round"></circle>
-                        </svg>
-                        <div class="text-center z-10">
-                            <span id="timer-display" class="text-6xl font-black font-mono"></span>
-                            <p class="text-slate-400 text-sm mt-1">segundos</p>
+                    <!-- CRONÓMETRO -->
+                    <div class="flex-1 flex items-center justify-center">
+                        <div class="relative w-48 h-48 sm:w-56 sm:h-56 flex items-center justify-center">
+                            <!-- Círculo SVG -->
+                            <svg class="absolute inset-0 w-full h-full timer-circle" viewBox="0 0 100 100">
+                                <circle cx="50" cy="50" r="45" fill="none" stroke="#1e293b" stroke-width="8"></circle>
+                                <circle id="timer-path" cx="50" cy="50" r="45" fill="none" stroke="#3b82f6" stroke-width="8" stroke-dasharray="283" stroke-dashoffset="0" stroke-linecap="round"></circle>
+                            </svg>
+                            <div class="text-center z-10 flex flex-col items-center">
+                                <span id="timer-display" class="text-5xl sm:text-6xl font-black font-mono mt-2"></span>
+                                <p class="text-slate-400 text-xs mt-1">segundos</p>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="flex gap-4">
-                        <button onclick="addTime(-30)" class="flex-1 py-3 bg-slate-800 rounded-xl font-bold active:bg-slate-700">-30s</button>
-                        <button onclick="addTime(30)" class="flex-1 py-3 bg-slate-800 rounded-xl font-bold active:bg-slate-700">+30s</button>
+                    <!-- INFO DEL PRÓXIMO EJERCICIO -->
+                    <div class="glass-panel p-4 rounded-xl border-l-4 ${isBlockChange ? 'border-l-blue-500' : 'border-l-yellow-500'} mb-4 text-left max-h-48 overflow-y-auto">
+                        <div class="flex justify-between items-start mb-2">
+                            <div>
+                                <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Prepárate para:</p>
+                                <p class="font-bold text-lg text-white leading-tight">${nextEx.name} ${!isBlockChange ? `<span class="text-sm font-normal text-slate-400 ml-1">(Serie ${currentSet})</span>` : ''}</p>
+                            </div>
+                            <span class="bg-blue-900/40 text-blue-300 text-[10px] font-bold px-2 py-1 rounded border border-blue-700/50 whitespace-nowrap ml-2">
+                                ${nextInfo.label}
+                            </span>
+                        </div>
+                        <p class="text-sm text-slate-300 leading-snug"><i class="fa-solid fa-circle-info text-blue-400 mr-1"></i> ${nextEx.technique}</p>
                     </div>
 
-                    <button onclick="skipTimer()" class="w-full mt-6 bg-slate-700 active:bg-slate-600 py-4 rounded-2xl font-bold text-lg transition">
-                        OMITIR DESCANSO <i class="fa-solid fa-forward-step ml-2"></i>
+                    <!-- CONTROLES -->
+                    <div class="flex gap-3 mb-4">
+                        <button onclick="addTime(-30)" class="flex-1 py-3 bg-slate-800 rounded-xl font-bold active:bg-slate-700 transition flex items-center justify-center gap-1 text-sm"><i class="fa-solid fa-minus"></i> 30s</button>
+                        <button onclick="addTime(30)" class="flex-1 py-3 bg-slate-800 rounded-xl font-bold active:bg-slate-700 transition flex items-center justify-center gap-1 text-sm"><i class="fa-solid fa-plus"></i> 30s</button>
+                    </div>
+
+                    <button onclick="skipTimer()" class="w-full bg-slate-700 active:bg-slate-600 py-4 rounded-2xl font-bold text-lg transition flex items-center justify-center gap-2">
+                        OMITIR DESCANSO <i class="fa-solid fa-forward-step"></i>
                     </button>
                 </div>
             `;
@@ -441,13 +556,14 @@
 
                 if (timeLeft <= 0) {
                     clearInterval(timerInterval);
-                    playLongBeep();
+                    playNotification();
                     triggerVibration([200, 100, 200, 100, 400]); // Patrón de vibración fin de descanso
                     renderExercise();
                 }
             }, 1000);
         }
 
+        // --- FUNCIÓN RESTAURADA ---
         function renderFinished() {
             releaseWakeLock();
             appContent.innerHTML = `
@@ -465,6 +581,53 @@
             `;
         }
 
+        window.renderLibrary = () => {
+            let html = `
+                <div class="fade-in mb-6">
+                    <button onclick="renderHome()" class="text-slate-400 mb-4 flex items-center gap-2 hover:text-white"><i class="fa-solid fa-arrow-left"></i> Volver</button>
+                    <h2 class="text-2xl font-bold mb-1 text-blue-400">Biblioteca de Ejercicios</h2>
+                    <p class="text-slate-300 text-sm mb-6">Detalles y consejos de todos los días de entrenamiento.</p>
+            `;
+            
+            Object.keys(routineData).forEach(key => {
+                const block = routineData[key];
+                html += `
+                    <div class="mb-8">
+                        <h3 class="text-xl font-bold border-b border-slate-700 pb-2 mb-4 flex items-center gap-2">
+                            <div class="w-8 h-8 rounded-full ${block.bg} bg-opacity-20 flex items-center justify-center">
+                                <i class="fa-solid ${block.icon} ${block.color} text-sm"></i>
+                            </div>
+                            ${block.title}
+                        </h3>
+                        <p class="text-sm text-slate-400 mb-4 italic px-2 border-l-2 border-slate-600">Objetivo: ${block.desc}</p>
+                        <div class="space-y-4">
+                `;
+                
+                block.exercises.forEach((ex, index) => {
+                    html += `
+                        <div class="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 shadow-sm">
+                            <h4 class="font-bold text-md text-white mb-2"><span class="text-blue-500">${index + 1}.</span> ${ex.name}</h4>
+                            <p class="text-sm text-slate-300 mb-3 leading-relaxed"><i class="fa-solid fa-circle-info text-blue-400 mr-1"></i> <strong>Técnica:</strong> ${ex.technique}</p>
+                            
+                            <div class="grid grid-cols-1 gap-2 mb-4 mt-3 bg-slate-900/50 p-3 rounded-lg text-xs">
+                                <p class="text-slate-300"><strong class="text-green-400"><i class="fa-solid fa-check"></i> Clave:</strong> ${ex.tips}</p>
+                                <p class="text-slate-300"><strong class="text-red-400"><i class="fa-solid fa-xmark"></i> Errores:</strong> ${ex.mistakes}</p>
+                            </div>
+
+                            <div class="text-xs text-yellow-400 font-mono bg-black/30 p-3 rounded-lg overflow-x-auto whitespace-nowrap">
+                                <i class="fa-solid fa-arrow-trend-up"></i> ${ex.progression ? '<strong>Progresiones:</strong><br/>' + ex.progression.join(' ➔ ') : '<strong>Meta:</strong> ' + ex.repsLabel}
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += `</div></div>`;
+            });
+            
+            html += `</div>`;
+            appContent.innerHTML = html;
+        };
+
         // --- 5. LÓGICA DE INTERFAZ GENERAL ---
         document.getElementById('btn-rules').addEventListener('click', () => {
             const modal = document.getElementById('modal-rules');
@@ -477,6 +640,21 @@
             modal.classList.add('opacity-0');
             setTimeout(() => modal.classList.add('hidden'), 300);
         });
+
+        // Evento de instalación de PWA manual
+        const btnInstall = document.getElementById('btn-install');
+        if (btnInstall) {
+            btnInstall.addEventListener('click', async () => {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    if (outcome === 'accepted') {
+                        btnInstall.classList.add('hidden');
+                    }
+                    deferredPrompt = null;
+                }
+            });
+        }
 
         // Inicializar
         renderHome();
